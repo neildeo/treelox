@@ -1,22 +1,50 @@
 mod expr;
+mod interpreter;
 mod parser;
 mod scanner;
 mod token;
+mod value;
 
-use std::{fs, io, path::Path, process::ExitCode};
+use std::{
+    fs,
+    io::{self, Write},
+    path::Path,
+    process::ExitCode,
+};
 
 pub fn repl() -> ExitCode {
     loop {
         let mut line = String::new();
+        io::stdout().write_all("> ".as_bytes()).unwrap();
+        io::stdout().flush().unwrap();
         match io::stdin().read_line(&mut line) {
             Ok(_) => {
                 if line.is_empty() {
+                    println!("Exiting REPL...");
                     break;
                 }
 
-                let (tokens, _) = scanner::scan(line);
-                for token in tokens {
-                    println!("{token:?}");
+                let (tokens, _had_error) = scanner::scan(line);
+                // if had_error {
+                //     return ExitCode::from(65);
+                // }
+
+                let expr = match parser::parse(tokens) {
+                    Ok(ex) => ex,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        continue;
+                        // return ExitCode::from(65);
+                    }
+                };
+
+                match interpreter::interpret(expr) {
+                    Ok(s) => println!("{s}"),
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        continue;
+                        // return ExitCode::from(70);
+                    }
                 }
             }
             Err(_) => {
@@ -29,39 +57,35 @@ pub fn repl() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Scan source file
-///
-/// # Returns
-/// bool which is true if any lexical errors were encountered
-pub fn tokenize(filename: &Path) -> bool {
-    let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-        eprintln!("Failed to read file {}", filename.display());
-        String::new()
-    });
+pub fn interpret_file(filename: &Path) -> ExitCode {
+    let file_contents = match fs::read_to_string(filename) {
+        Ok(s) => s,
+        Err(_) => {
+            eprintln!("Failed to read file {}", filename.display());
+            return ExitCode::from(65);
+        }
+    };
 
     let (tokens, had_error) = scanner::scan(file_contents);
-    for token in tokens {
-        println!("{token:?}");
+    if had_error {
+        return ExitCode::from(65);
     }
 
-    had_error
-}
-
-pub fn parse(filename: &Path) -> bool {
-    let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-        eprintln!("Failed to read file {}", filename.display());
-        String::new()
-    });
-
-    let (tokens, mut had_error) = scanner::scan(file_contents);
-
-    match parser::parse(tokens) {
-        Ok(expr) => println!("{expr}"),
+    let expr = match parser::parse(tokens) {
+        Ok(ex) => ex,
         Err(e) => {
-            eprintln!("{e}");
-            had_error = true;
+            eprintln!("{}", e);
+            return ExitCode::from(65);
+        }
+    };
+
+    match interpreter::interpret(expr) {
+        Ok(s) => println!("{s}"),
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::from(70);
         }
     }
 
-    had_error
+    ExitCode::SUCCESS
 }

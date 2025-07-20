@@ -1,5 +1,6 @@
-use crate::expr::{Binary, Expr, Grouping, Literal, Unary, Value};
+use crate::expr::{Binary, Expr, Grouping, Literal, Unary};
 use crate::token::Token;
+use crate::value::Value;
 use std::error::Error;
 use std::fmt::Display;
 use std::iter::Peekable;
