@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Token {
     // Single character tokens
     LeftParen,

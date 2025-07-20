@@ -2,6 +2,7 @@ mod expr;
 mod interpreter;
 mod parser;
 mod scanner;
+mod stmt;
 mod token;
 mod value;
 
@@ -29,8 +30,8 @@ pub fn repl() -> ExitCode {
                 //     return ExitCode::from(65);
                 // }
 
-                let expr = match parser::parse(tokens) {
-                    Ok(ex) => ex,
+                let stmts = match parser::parse(tokens) {
+                    Ok(s) => s,
                     Err(e) => {
                         eprintln!("{}", e);
                         continue;
@@ -38,8 +39,8 @@ pub fn repl() -> ExitCode {
                     }
                 };
 
-                match interpreter::interpret(expr) {
-                    Ok(s) => println!("{s}"),
+                match interpreter::interpret(stmts) {
+                    Ok(()) => {}
                     Err(e) => {
                         eprintln!("{}", e);
                         continue;
@@ -71,16 +72,16 @@ pub fn interpret_file(filename: &Path) -> ExitCode {
         return ExitCode::from(65);
     }
 
-    let expr = match parser::parse(tokens) {
-        Ok(ex) => ex,
+    let stmts = match parser::parse(tokens) {
+        Ok(s) => s,
         Err(e) => {
             eprintln!("{}", e);
             return ExitCode::from(65);
         }
     };
 
-    match interpreter::interpret(expr) {
-        Ok(s) => println!("{s}"),
+    match interpreter::interpret(stmts) {
+        Ok(()) => {}
         Err(e) => {
             eprintln!("{}", e);
             return ExitCode::from(70);

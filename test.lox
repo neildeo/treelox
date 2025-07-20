@@ -1,1 +1,4 @@
-(2 * 3 - 6) / 0
+print (2 * 3 - 6) / 0;
+print "one";
+print 45 > 50;
+print 3 + 7;

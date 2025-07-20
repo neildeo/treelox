@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use crate::{expr::Expr, value::TypeError};
+use crate::{stmt::Stmt, value::TypeError};
 
 #[derive(Debug)]
 pub struct RuntimeError {
@@ -33,8 +33,10 @@ impl From<TypeError> for RuntimeError {
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;
 
-pub fn interpret(expr: impl Expr) -> Result<String> {
-    let value = expr.interpret()?;
+pub fn interpret(statements: Vec<Box<dyn Stmt>>) -> Result<()> {
+    for stmt in statements {
+        stmt.interpret()?;
+    }
 
-    Ok(format!("{}", value))
+    Ok(())
 }

@@ -1,4 +1,5 @@
 use crate::expr::{Binary, Expr, Grouping, Literal, Unary};
+use crate::stmt::{Expression, Print, Stmt};
 use crate::token::Token;
 use crate::value::Value;
 use std::error::Error;
@@ -17,8 +18,10 @@ impl Display for ParseError {
 }
 
 impl ParseError {
-    fn new(message: String) -> Self {
-        ParseError { message }
+    fn new(message: &str) -> Self {
+        ParseError {
+            message: message.to_string(),
+        }
     }
 }
 
@@ -26,15 +29,25 @@ impl Error for ParseError {}
 
 pub type Result<T> = std::result::Result<T, ParseError>;
 
-pub fn parse(tokens: Vec<Token>) -> Result<Box<dyn Expr>> {
+pub fn parse(tokens: Vec<Token>) -> Result<Vec<Box<dyn Stmt>>> {
     let mut tokens = tokens.into_iter().peekable();
-    expression(&mut tokens)
+    let mut statements = Vec::<Box<dyn Stmt>>::new();
+
+    while let Some(token) = tokens.peek() {
+        if *token == Token::EOF {
+            break;
+        }
+
+        statements.push(statement(&mut tokens)?);
+    }
+
+    Ok(statements)
 }
 
 fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
-    let t = tokens.next().ok_or(ParseError::new(
-        "Value token required but none found".to_string(),
-    ))?;
+    let t = tokens
+        .next()
+        .ok_or(ParseError::new("Value token required but none found"))?;
     match t {
         Token::True => Ok(Box::new(Literal::new(Value::True))),
         Token::False => Ok(Box::new(Literal::new(Value::False))),
@@ -45,11 +58,11 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn
             let expr = expression(tokens)?;
             match tokens.next() {
                 Some(Token::RightParen) => Ok(Box::new(Grouping::new(expr))),
-                _ => Err(ParseError::new("Closing parenthesis missing".to_string())),
+                _ => Err(ParseError::new("Closing parenthesis missing")),
             }
         }
         _ => Err(ParseError::new(
-            "Reached EOF before expression was completed".to_string(),
+            "Reached EOF before expression was completed",
         )),
     }
 }
@@ -123,4 +136,45 @@ fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dy
 
 fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
     equality(tokens)
+}
+
+fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+    let t = tokens
+        .peek()
+        .ok_or(ParseError::new("Non-EOF token required but none found"))?;
+    match *t {
+        Token::Print => {
+            // Consume PRINT
+            tokens.next();
+            print_statement(tokens)
+        }
+        _ => expression_statement(tokens),
+    }
+}
+
+fn consume_semicolon(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<()> {
+    let maybe_semicolon = tokens
+        .next()
+        .ok_or(ParseError::new("Expect ';' after value."))?;
+    if maybe_semicolon != Token::Semicolon {
+        return Err(ParseError::new("Expect ';' after value."));
+    }
+
+    Ok(())
+}
+
+fn expression_statement(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+) -> Result<Box<dyn Stmt>> {
+    let expr = expression(tokens)?;
+    consume_semicolon(tokens)?;
+
+    Ok(Box::new(Expression::new(expr)))
+}
+
+fn print_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+    let expr = expression(tokens)?;
+    consume_semicolon(tokens)?;
+
+    Ok(Box::new(Print::new(expr)))
 }
