@@ -1,6 +1,26 @@
 use std::{error::Error, fmt::Display};
 
-use crate::{stmt::Stmt, value::TypeError};
+use crate::{environment::Environment, stmt::Stmt, value::TypeError};
+
+pub struct Interpreter {
+    env: Environment,
+}
+
+impl Interpreter {
+    pub fn new() -> Self {
+        Interpreter {
+            env: Environment::new(),
+        }
+    }
+
+    pub fn interpret(&mut self, statements: Vec<Box<dyn Stmt>>) -> Result<()> {
+        for stmt in statements {
+            stmt.interpret(&mut self.env)?;
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub struct RuntimeError {
@@ -32,11 +52,3 @@ impl From<TypeError> for RuntimeError {
 }
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;
-
-pub fn interpret(statements: Vec<Box<dyn Stmt>>) -> Result<()> {
-    for stmt in statements {
-        stmt.interpret()?;
-    }
-
-    Ok(())
-}

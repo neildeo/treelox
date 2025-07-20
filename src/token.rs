@@ -160,3 +160,102 @@ impl Display for Token {
         write!(f, "{token_string}")
     }
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TokenType {
+    // Single character tokens
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
+
+    // One or two character tokens
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+
+    // Literals
+    String,
+    Number,
+    Identifier,
+
+    // Keywords
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+
+    // End of file
+    #[allow(clippy::upper_case_acronyms)]
+    EOF,
+}
+
+impl From<&Token> for TokenType {
+    fn from(value: &Token) -> Self {
+        match *value {
+            Token::LeftParen => TokenType::LeftParen,
+            Token::RightParen => TokenType::RightParen,
+            Token::LeftBrace => TokenType::LeftBrace,
+            Token::RightBrace => TokenType::RightBrace,
+            Token::Comma => TokenType::Comma,
+            Token::Dot => TokenType::Dot,
+            Token::Minus => TokenType::Minus,
+            Token::Plus => TokenType::Plus,
+            Token::Semicolon => TokenType::Semicolon,
+            Token::Slash => TokenType::Slash,
+            Token::Star => TokenType::Star,
+            Token::Bang => TokenType::Bang,
+            Token::BangEqual => TokenType::BangEqual,
+            Token::Equal => TokenType::Equal,
+            Token::EqualEqual => TokenType::EqualEqual,
+            Token::Greater => TokenType::Greater,
+            Token::GreaterEqual => TokenType::GreaterEqual,
+            Token::Less => TokenType::Less,
+            Token::LessEqual => TokenType::LessEqual,
+            Token::String(_, _) => TokenType::String,
+            Token::Number(_, _) => TokenType::Number,
+            Token::Identifier(_) => TokenType::Identifier,
+            Token::And => TokenType::And,
+            Token::Class => TokenType::Class,
+            Token::Else => TokenType::Else,
+            Token::False => TokenType::False,
+            Token::Fun => TokenType::Fun,
+            Token::For => TokenType::For,
+            Token::If => TokenType::If,
+            Token::Nil => TokenType::Nil,
+            Token::Or => TokenType::Or,
+            Token::Print => TokenType::Print,
+            Token::Return => TokenType::Return,
+            Token::Super => TokenType::Super,
+            Token::This => TokenType::This,
+            Token::True => TokenType::True,
+            Token::Var => TokenType::Var,
+            Token::While => TokenType::While,
+            Token::EOF => TokenType::EOF,
+        }
+    }
+}

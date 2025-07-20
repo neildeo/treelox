@@ -1,3 +1,4 @@
+mod environment;
 mod expr;
 mod interpreter;
 mod parser;
@@ -13,7 +14,11 @@ use std::{
     process::ExitCode,
 };
 
+use crate::interpreter::Interpreter;
+
 pub fn repl() -> ExitCode {
+    let mut interpreter = Interpreter::new();
+
     loop {
         let mut line = String::new();
         io::stdout().write_all("> ".as_bytes()).unwrap();
@@ -39,7 +44,7 @@ pub fn repl() -> ExitCode {
                     }
                 };
 
-                match interpreter::interpret(stmts) {
+                match interpreter.interpret(stmts) {
                     Ok(()) => {}
                     Err(e) => {
                         eprintln!("{}", e);
@@ -59,6 +64,8 @@ pub fn repl() -> ExitCode {
 }
 
 pub fn interpret_file(filename: &Path) -> ExitCode {
+    let mut interpreter = Interpreter::new();
+
     let file_contents = match fs::read_to_string(filename) {
         Ok(s) => s,
         Err(_) => {
@@ -80,7 +87,7 @@ pub fn interpret_file(filename: &Path) -> ExitCode {
         }
     };
 
-    match interpreter::interpret(stmts) {
+    match interpreter.interpret(stmts) {
         Ok(()) => {}
         Err(e) => {
             eprintln!("{}", e);

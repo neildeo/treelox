@@ -1,4 +1,5 @@
 use crate::{
+    environment::Environment,
     interpreter::Result,
     token::Token,
     value::{TypeError, Value},
@@ -7,7 +8,7 @@ use core::panic;
 use std::fmt::Display;
 
 pub trait Expr: Display {
-    fn interpret(&self) -> Result<Value>;
+    fn interpret(&self, env: &mut Environment) -> Result<Value>;
 }
 
 pub struct Binary<L: Expr, R: Expr> {
@@ -33,9 +34,9 @@ impl<L: Expr, R: Expr> Display for Binary<L, R> {
 }
 
 impl<L: Expr, R: Expr> Expr for Binary<L, R> {
-    fn interpret(&self) -> Result<Value> {
-        let left = self.left.interpret()?;
-        let right = self.right.interpret()?;
+    fn interpret(&self, env: &mut Environment) -> Result<Value> {
+        let left = self.left.interpret(env)?;
+        let right = self.right.interpret(env)?;
 
         match self.operator {
             Token::Minus => Ok(Value::Number(f64::try_from(left)? - f64::try_from(right)?)),
@@ -82,8 +83,8 @@ impl<E: Expr> Display for Grouping<E> {
 }
 
 impl<E: Expr> Expr for Grouping<E> {
-    fn interpret(&self) -> Result<Value> {
-        self.expr.interpret()
+    fn interpret(&self, env: &mut Environment) -> Result<Value> {
+        self.expr.interpret(env)
     }
 }
 
@@ -104,7 +105,7 @@ impl Display for Literal {
 }
 
 impl Expr for Literal {
-    fn interpret(&self) -> Result<Value> {
+    fn interpret(&self, _env: &mut Environment) -> Result<Value> {
         Ok(self.value.clone())
     }
 }
@@ -127,8 +128,8 @@ impl<E: Expr> Display for Unary<E> {
 }
 
 impl<E: Expr> Expr for Unary<E> {
-    fn interpret(&self) -> Result<Value> {
-        let right = self.expr.interpret()?;
+    fn interpret(&self, env: &mut Environment) -> Result<Value> {
+        let right = self.expr.interpret(env)?;
 
         match self.operator {
             Token::Minus => match right {
@@ -142,7 +143,29 @@ impl<E: Expr> Expr for Unary<E> {
 }
 
 impl Expr for Box<dyn Expr> {
-    fn interpret(&self) -> Result<Value> {
-        (**self).interpret()
+    fn interpret(&self, env: &mut Environment) -> Result<Value> {
+        (**self).interpret(env)
+    }
+}
+
+pub struct Variable {
+    pub name: String,
+}
+
+impl Variable {
+    pub fn new(name: String) -> Self {
+        Variable { name }
+    }
+}
+
+impl Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl Expr for Variable {
+    fn interpret(&self, env: &mut Environment) -> Result<Value> {
+        env.get(&self.name).cloned()
     }
 }

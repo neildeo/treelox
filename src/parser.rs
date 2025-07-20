@@ -1,6 +1,6 @@
-use crate::expr::{Binary, Expr, Grouping, Literal, Unary};
-use crate::stmt::{Expression, Print, Stmt};
-use crate::token::Token;
+use crate::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::stmt::{Expression, Print, Stmt, Var};
+use crate::token::{Token, TokenType};
 use crate::value::Value;
 use std::error::Error;
 use std::fmt::Display;
@@ -38,10 +38,23 @@ pub fn parse(tokens: Vec<Token>) -> Result<Vec<Box<dyn Stmt>>> {
             break;
         }
 
-        statements.push(statement(&mut tokens)?);
+        statements.push(declaration(&mut tokens)?);
     }
 
     Ok(statements)
+}
+
+pub fn consume(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+    token_type: TokenType,
+    message: &str,
+) -> Result<Token> {
+    let maybe_token = tokens.next().ok_or(ParseError::new(message))?;
+    if TokenType::from(&maybe_token) != token_type {
+        return Err(ParseError::new(message));
+    }
+
+    Ok(maybe_token)
 }
 
 fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
@@ -61,6 +74,7 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn
                 _ => Err(ParseError::new("Closing parenthesis missing")),
             }
         }
+        Token::Identifier(name) => Ok(Box::new(Variable::new(name))),
         _ => Err(ParseError::new(
             "Reached EOF before expression was completed",
         )),
@@ -152,29 +166,55 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<d
     }
 }
 
-fn consume_semicolon(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<()> {
-    let maybe_semicolon = tokens
-        .next()
-        .ok_or(ParseError::new("Expect ';' after value."))?;
-    if maybe_semicolon != Token::Semicolon {
-        return Err(ParseError::new("Expect ';' after value."));
-    }
-
-    Ok(())
-}
-
 fn expression_statement(
     tokens: &mut Peekable<impl Iterator<Item = Token>>,
 ) -> Result<Box<dyn Stmt>> {
     let expr = expression(tokens)?;
-    consume_semicolon(tokens)?;
+    consume(tokens, TokenType::Semicolon, "Expect ';' after expression.")?;
 
     Ok(Box::new(Expression::new(expr)))
 }
 
 fn print_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
     let expr = expression(tokens)?;
-    consume_semicolon(tokens)?;
+    consume(tokens, TokenType::Semicolon, "Expect ';' after expression.")?;
 
     Ok(Box::new(Print::new(expr)))
+}
+
+fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+    if tokens.peek().is_some_and(|t| t == &Token::Var) {
+        match var_declaration(tokens) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                println!("{}", &e);
+                synchronise();
+                Err(e)
+            }
+        }
+    } else {
+        statement(tokens)
+    }
+}
+
+fn var_declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+    consume(tokens, TokenType::Var, "Expect VAR keyword.")?;
+
+    let name = consume(tokens, TokenType::Identifier, "Expect variable name")?;
+    let initialiser = if consume(tokens, TokenType::Equal, "").is_ok() {
+        Some(expression(tokens)?)
+    } else {
+        None
+    };
+
+    consume(
+        tokens,
+        TokenType::Semicolon,
+        "Expect ';' after variable declaration.",
+    )?;
+    Ok(Box::new(Var::new(name, initialiser)))
+}
+
+fn synchronise() {
+    todo!()
 }
