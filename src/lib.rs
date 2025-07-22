@@ -41,16 +41,20 @@ pub fn repl() -> ExitCode {
                 }
 
                 match interpreter.interpret(stmts) {
-                    Ok(()) => {}
+                    Ok(maybe_val) => {
+                        if let Some(val) = maybe_val {
+                            println!("{val}");
+                        }
+                    }
                     Err(e) => {
-                        eprintln!("{}", e);
+                        println!("{}", e);
                         continue;
                         // return ExitCode::from(70);
                     }
                 }
             }
             Err(_) => {
-                eprintln!("Error in REPL read_line");
+                println!("Error in REPL read_line");
                 return ExitCode::from(74);
             }
         }
@@ -83,7 +87,7 @@ pub fn interpret_file(filename: &Path) -> ExitCode {
     }
 
     match interpreter.interpret(stmts) {
-        Ok(()) => {}
+        Ok(_) => {}
         Err(e) => {
             eprintln!("{}", e);
             return ExitCode::from(70);

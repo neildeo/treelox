@@ -56,8 +56,9 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Box<dyn Stmt>> {
             break;
         }
 
-        if let Ok(stmt) = declaration(&mut tokens) {
-            statements.push(stmt);
+        match declaration(&mut tokens) {
+            Ok(stmt) => statements.push(stmt),
+            Err(e) => eprintln!("{}", e.clone()),
         }
     }
 

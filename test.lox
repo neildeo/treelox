@@ -1,7 +1,5 @@
 var x = 1;
 var y = 2;
 print x / y;
-var a;
-print a;
-a = 2;
-print a;
+x = y = 2;
+print x * y;

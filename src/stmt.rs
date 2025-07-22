@@ -1,12 +1,12 @@
-use core::panic;
-
 use crate::environment::Environment;
 use crate::expr::Expr;
 use crate::interpreter::Result;
 use crate::token::{Token, TokenType};
+use crate::value::Value;
+use core::panic;
 
 pub trait Stmt {
-    fn interpret(&self, env: &mut Environment) -> Result<()>;
+    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>>;
 }
 
 pub struct Expression {
@@ -20,9 +20,9 @@ impl Expression {
 }
 
 impl Stmt for Expression {
-    fn interpret(&self, env: &mut Environment) -> Result<()> {
-        self.expression.interpret(env)?;
-        Ok(())
+    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
+        let value = self.expression.interpret(env)?;
+        Ok(Some(value))
     }
 }
 
@@ -37,10 +37,10 @@ impl Print {
 }
 
 impl Stmt for Print {
-    fn interpret(&self, env: &mut Environment) -> Result<()> {
+    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
         let value = self.expression.interpret(env)?;
         println!("{}", value);
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -59,7 +59,7 @@ impl Var {
 }
 
 impl Stmt for Var {
-    fn interpret(&self, env: &mut Environment) -> Result<()> {
+    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
         let value = match &self.initialiser {
             Some(expr) => expr.interpret(env)?,
             None => crate::value::Value::Nil,
@@ -67,14 +67,12 @@ impl Stmt for Var {
 
         env.define(self.name.clone(), value);
 
-        Ok(())
+        Ok(None)
     }
 }
 
 impl Stmt for Box<dyn Stmt> {
-    fn interpret(&self, env: &mut Environment) -> Result<()> {
-        (**self).interpret(env)?;
-
-        Ok(())
+    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
+        (**self).interpret(env)
     }
 }

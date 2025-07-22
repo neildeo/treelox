@@ -1,6 +1,11 @@
 use std::{error::Error, fmt::Display};
 
-use crate::{environment::Environment, stmt::Stmt, token::Token, value::TypeError};
+use crate::{
+    environment::Environment,
+    stmt::Stmt,
+    token::Token,
+    value::{TypeError, Value},
+};
 
 pub struct Interpreter {
     env: Environment,
@@ -13,12 +18,13 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&mut self, statements: Vec<Box<dyn Stmt>>) -> Result<()> {
+    pub fn interpret(&mut self, statements: Vec<Box<dyn Stmt>>) -> Result<Option<Value>> {
+        let mut value = None;
         for stmt in statements {
-            stmt.interpret(&mut self.env)?;
+            value = stmt.interpret(&mut self.env)?;
         }
 
-        Ok(())
+        Ok(value)
     }
 }
 
