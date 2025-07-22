@@ -3,7 +3,7 @@ use core::panic;
 use crate::environment::Environment;
 use crate::expr::Expr;
 use crate::interpreter::Result;
-use crate::token::Token;
+use crate::token::{Token, TokenType};
 
 pub trait Stmt {
     fn interpret(&self, env: &mut Environment) -> Result<()>;
@@ -45,17 +45,16 @@ impl Stmt for Print {
 }
 
 pub struct Var {
-    name: String,
+    name: Token,
     initialiser: Option<Box<dyn Expr>>,
 }
 
 impl Var {
     pub fn new(name: Token, initialiser: Option<Box<dyn Expr>>) -> Self {
-        let name = match name {
-            Token::Identifier(name) => name,
+        match name.token_type {
+            TokenType::Identifier => Var { name, initialiser },
             _ => panic!("Variable name token is not an identifier."),
-        };
-        Var { name, initialiser }
+        }
     }
 }
 
@@ -67,6 +66,14 @@ impl Stmt for Var {
         };
 
         env.define(self.name.clone(), value);
+
+        Ok(())
+    }
+}
+
+impl Stmt for Box<dyn Stmt> {
+    fn interpret(&self, env: &mut Environment) -> Result<()> {
+        (**self).interpret(env)?;
 
         Ok(())
     }

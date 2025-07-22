@@ -1,106 +1,90 @@
 use std::fmt::{Debug, Display};
 
+use crate::value::TypeError;
+
 #[derive(Clone, PartialEq)]
-pub enum Token {
-    // Single character tokens
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    Dot,
-    Minus,
-    Plus,
-    Semicolon,
-    Slash,
-    Star,
+pub struct Token {
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub literal: LiteralValue,
+    pub line: usize,
+}
 
-    // One or two character tokens
-    Bang,
-    BangEqual,
-    Equal,
-    EqualEqual,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
+impl Token {
+    pub fn new(token_type: TokenType, lexeme: String, literal: LiteralValue, line: usize) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            literal,
+            line,
+        }
+    }
+}
 
-    // Literals
-    String(String, String),
-    Number(String, f64),
-    Identifier(String),
+impl TryFrom<Token> for String {
+    type Error = TypeError;
 
-    // Keywords
-    And,
-    Class,
-    Else,
-    False,
-    Fun,
-    For,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Var,
-    While,
+    fn try_from(value: Token) -> Result<Self, Self::Error> {
+        match Self::try_from(value.literal.clone()) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(TypeError::new(value, &e)),
+        }
+    }
+}
 
-    // End of file
-    #[allow(clippy::upper_case_acronyms)]
-    EOF,
+impl TryFrom<Token> for f64 {
+    type Error = TypeError;
+
+    fn try_from(value: Token) -> Result<Self, Self::Error> {
+        match Self::try_from(value.literal.clone()) {
+            Ok(x) => Ok(x),
+            Err(e) => Err(TypeError::new(value, &e)),
+        }
+    }
 }
 
 impl Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let token_string = match &self {
-            Token::LeftParen => "LEFT_PAREN ( null",
-            Token::RightParen => "RIGHT_PAREN ) null",
-            Token::EOF => "EOF  null",
-            Token::LeftBrace => "LEFT_BRACE { null",
-            Token::RightBrace => "RIGHT_BRACE } null",
-            Token::Comma => "COMMA , null",
-            Token::Dot => "DOT . null",
-            Token::Minus => "MINUS - null",
-            Token::Plus => "PLUS + null",
-            Token::Semicolon => "SEMICOLON ; null",
-            Token::Star => "STAR * null",
-            Token::Slash => "SLASH / null",
-            Token::Bang => "BANG ! null",
-            Token::BangEqual => "BANG_EQUAL != null",
-            Token::Equal => "EQUAL = null",
-            Token::EqualEqual => "EQUAL_EQUAL == null",
-            Token::Greater => "GREATER > null",
-            Token::GreaterEqual => "GREATER_EQUAL >= null",
-            Token::Less => "LESS < null",
-            Token::LessEqual => "LESS_EQUAL <= null",
-            Token::String(lexeme, literal) => &format!("STRING {lexeme} {literal}"),
-            Token::Number(lexeme, literal) => {
-                if literal.to_string().contains('.') {
-                    &format!("NUMBER {lexeme} {literal}")
-                } else {
-                    &format!("NUMBER {lexeme} {literal}.0")
-                }
-            }
-            Token::Identifier(lexeme) => &format!("IDENTIFIER {lexeme} null"),
-            Token::And => "AND and null",
-            Token::Class => "CLASS class null",
-            Token::Else => "ELSE else null",
-            Token::False => "FALSE false null",
-            Token::Fun => "FUN fun null",
-            Token::For => "FOR for null",
-            Token::If => "IF if null",
-            Token::Nil => "NIL nil null",
-            Token::Or => "OR or null",
-            Token::Print => "PRINT print null",
-            Token::Return => "RETURN return null",
-            Token::Super => "SUPER super null",
-            Token::This => "THIS this null",
-            Token::True => "TRUE true null",
-            Token::Var => "VAR var null",
-            Token::While => "WHILE while null",
+        let token_string = match &self.token_type {
+            TokenType::LeftParen => "LEFT_PAREN ( null",
+            TokenType::RightParen => "RIGHT_PAREN ) null",
+            TokenType::EOF => "EOF  null",
+            TokenType::LeftBrace => "LEFT_BRACE { null",
+            TokenType::RightBrace => "RIGHT_BRACE } null",
+            TokenType::Comma => "COMMA , null",
+            TokenType::Dot => "DOT . null",
+            TokenType::Minus => "MINUS - null",
+            TokenType::Plus => "PLUS + null",
+            TokenType::Semicolon => "SEMICOLON ; null",
+            TokenType::Star => "STAR * null",
+            TokenType::Slash => "SLASH / null",
+            TokenType::Bang => "BANG ! null",
+            TokenType::BangEqual => "BANG_EQUAL != null",
+            TokenType::Equal => "EQUAL = null",
+            TokenType::EqualEqual => "EQUAL_EQUAL == null",
+            TokenType::Greater => "GREATER > null",
+            TokenType::GreaterEqual => "GREATER_EQUAL >= null",
+            TokenType::Less => "LESS < null",
+            TokenType::LessEqual => "LESS_EQUAL <= null",
+            TokenType::String => &format!("STRING {} {}", self.lexeme, self.literal),
+            TokenType::Number => &format!("NUMBER {} {}", self.lexeme, self.literal),
+            TokenType::Identifier => &format!("IDENTIFIER {} null", self.lexeme),
+            TokenType::And => "AND and null",
+            TokenType::Class => "CLASS class null",
+            TokenType::Else => "ELSE else null",
+            TokenType::False => "FALSE false null",
+            TokenType::Fun => "FUN fun null",
+            TokenType::For => "FOR for null",
+            TokenType::If => "IF if null",
+            TokenType::Nil => "NIL nil null",
+            TokenType::Or => "OR or null",
+            TokenType::Print => "PRINT print null",
+            TokenType::Return => "RETURN return null",
+            TokenType::Super => "SUPER super null",
+            TokenType::This => "THIS this null",
+            TokenType::True => "TRUE true null",
+            TokenType::Var => "VAR var null",
+            TokenType::While => "WHILE while null",
         };
 
         write!(f, "{token_string}")
@@ -109,59 +93,53 @@ impl Debug for Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let token_string = match &self {
-            Token::LeftParen => "(",
-            Token::RightParen => ")",
-            Token::EOF => "EOF",
-            Token::LeftBrace => "{",
-            Token::RightBrace => "}",
-            Token::Comma => ",",
-            Token::Dot => ".",
-            Token::Minus => "-",
-            Token::Plus => "+",
-            Token::Semicolon => ";",
-            Token::Star => "*",
-            Token::Slash => "/",
-            Token::Bang => "!",
-            Token::BangEqual => "!=",
-            Token::Equal => "=",
-            Token::EqualEqual => "==",
-            Token::Greater => ">",
-            Token::GreaterEqual => ">=",
-            Token::Less => "<",
-            Token::LessEqual => "<=",
-            Token::String(lexeme, _literal) => lexeme,
-            Token::Number(_lexeme, literal) => {
-                if literal.to_string().contains('.') {
-                    &format!("{literal}")
-                } else {
-                    &format!("{literal}.0")
-                }
-            }
-            Token::Identifier(lexeme) => lexeme,
-            Token::And => "and",
-            Token::Class => "class",
-            Token::Else => "else",
-            Token::False => "false",
-            Token::Fun => "fun",
-            Token::For => "for",
-            Token::If => "if",
-            Token::Nil => "nil",
-            Token::Or => "or",
-            Token::Print => "print",
-            Token::Return => "return",
-            Token::Super => "super",
-            Token::This => "this",
-            Token::True => "true",
-            Token::Var => "var",
-            Token::While => "while",
+        let token_string = match &self.token_type {
+            TokenType::LeftParen => "(",
+            TokenType::RightParen => ")",
+            TokenType::EOF => "EOF",
+            TokenType::LeftBrace => "{",
+            TokenType::RightBrace => "}",
+            TokenType::Comma => ",",
+            TokenType::Dot => ".",
+            TokenType::Minus => "-",
+            TokenType::Plus => "+",
+            TokenType::Semicolon => ";",
+            TokenType::Star => "*",
+            TokenType::Slash => "/",
+            TokenType::Bang => "!",
+            TokenType::BangEqual => "!=",
+            TokenType::Equal => "=",
+            TokenType::EqualEqual => "==",
+            TokenType::Greater => ">",
+            TokenType::GreaterEqual => ">=",
+            TokenType::Less => "<",
+            TokenType::LessEqual => "<=",
+            TokenType::String => &format!("{}", self.literal),
+            TokenType::Number => &format!("{}", self.literal),
+            TokenType::Identifier => &self.lexeme,
+            TokenType::And => "and",
+            TokenType::Class => "class",
+            TokenType::Else => "else",
+            TokenType::False => "false",
+            TokenType::Fun => "fun",
+            TokenType::For => "for",
+            TokenType::If => "if",
+            TokenType::Nil => "nil",
+            TokenType::Or => "or",
+            TokenType::Print => "print",
+            TokenType::Return => "return",
+            TokenType::Super => "super",
+            TokenType::This => "this",
+            TokenType::True => "true",
+            TokenType::Var => "var",
+            TokenType::While => "while",
         };
 
         write!(f, "{token_string}")
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenType {
     // Single character tokens
     LeftParen,
@@ -216,46 +194,59 @@ pub enum TokenType {
 
 impl From<&Token> for TokenType {
     fn from(value: &Token) -> Self {
-        match *value {
-            Token::LeftParen => TokenType::LeftParen,
-            Token::RightParen => TokenType::RightParen,
-            Token::LeftBrace => TokenType::LeftBrace,
-            Token::RightBrace => TokenType::RightBrace,
-            Token::Comma => TokenType::Comma,
-            Token::Dot => TokenType::Dot,
-            Token::Minus => TokenType::Minus,
-            Token::Plus => TokenType::Plus,
-            Token::Semicolon => TokenType::Semicolon,
-            Token::Slash => TokenType::Slash,
-            Token::Star => TokenType::Star,
-            Token::Bang => TokenType::Bang,
-            Token::BangEqual => TokenType::BangEqual,
-            Token::Equal => TokenType::Equal,
-            Token::EqualEqual => TokenType::EqualEqual,
-            Token::Greater => TokenType::Greater,
-            Token::GreaterEqual => TokenType::GreaterEqual,
-            Token::Less => TokenType::Less,
-            Token::LessEqual => TokenType::LessEqual,
-            Token::String(_, _) => TokenType::String,
-            Token::Number(_, _) => TokenType::Number,
-            Token::Identifier(_) => TokenType::Identifier,
-            Token::And => TokenType::And,
-            Token::Class => TokenType::Class,
-            Token::Else => TokenType::Else,
-            Token::False => TokenType::False,
-            Token::Fun => TokenType::Fun,
-            Token::For => TokenType::For,
-            Token::If => TokenType::If,
-            Token::Nil => TokenType::Nil,
-            Token::Or => TokenType::Or,
-            Token::Print => TokenType::Print,
-            Token::Return => TokenType::Return,
-            Token::Super => TokenType::Super,
-            Token::This => TokenType::This,
-            Token::True => TokenType::True,
-            Token::Var => TokenType::Var,
-            Token::While => TokenType::While,
-            Token::EOF => TokenType::EOF,
+        value.token_type.clone()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralValue {
+    String(String),
+    Number(f64),
+    Null,
+}
+
+impl Display for LiteralValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            LiteralValue::String(s) => s,
+            LiteralValue::Number(x) => &format!("{x}"),
+            LiteralValue::Null => "NULL",
+        };
+
+        write!(f, "{}", str)
+    }
+}
+
+impl From<String> for LiteralValue {
+    fn from(value: String) -> Self {
+        LiteralValue::String(value)
+    }
+}
+
+impl TryFrom<LiteralValue> for String {
+    type Error = String;
+
+    fn try_from(value: LiteralValue) -> Result<Self, Self::Error> {
+        match value {
+            LiteralValue::String(s) => Ok(s),
+            v => Err(format!("Invalid literal for string: {v}")),
+        }
+    }
+}
+
+impl From<f64> for LiteralValue {
+    fn from(value: f64) -> Self {
+        LiteralValue::Number(value)
+    }
+}
+
+impl TryFrom<LiteralValue> for f64 {
+    type Error = String;
+
+    fn try_from(value: LiteralValue) -> Result<Self, Self::Error> {
+        match value {
+            LiteralValue::Number(x) => Ok(x),
+            v => Err(format!("Invalid literal for number: {v}")),
         }
     }
 }

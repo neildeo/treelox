@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::token::Token;
+use crate::token::{LiteralValue, Token, TokenType};
 use itertools::Itertools;
 
 /// Scan source string
@@ -15,72 +15,162 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
     let mut had_error = false;
 
     let mut keywords = HashMap::new();
-    keywords.insert("and", Token::And);
-    keywords.insert("class", Token::Class);
-    keywords.insert("else", Token::Else);
-    keywords.insert("false", Token::False);
-    keywords.insert("for", Token::For);
-    keywords.insert("fun", Token::Fun);
-    keywords.insert("if", Token::If);
-    keywords.insert("nil", Token::Nil);
-    keywords.insert("or", Token::Or);
-    keywords.insert("print", Token::Print);
-    keywords.insert("return", Token::Return);
-    keywords.insert("super", Token::Super);
-    keywords.insert("this", Token::This);
-    keywords.insert("true", Token::True);
-    keywords.insert("var", Token::Var);
-    keywords.insert("while", Token::While);
+    keywords.insert("and", TokenType::And);
+    keywords.insert("class", TokenType::Class);
+    keywords.insert("else", TokenType::Else);
+    keywords.insert("false", TokenType::False);
+    keywords.insert("for", TokenType::For);
+    keywords.insert("fun", TokenType::Fun);
+    keywords.insert("if", TokenType::If);
+    keywords.insert("nil", TokenType::Nil);
+    keywords.insert("or", TokenType::Or);
+    keywords.insert("print", TokenType::Print);
+    keywords.insert("return", TokenType::Return);
+    keywords.insert("super", TokenType::Super);
+    keywords.insert("this", TokenType::This);
+    keywords.insert("true", TokenType::True);
+    keywords.insert("var", TokenType::Var);
+    keywords.insert("while", TokenType::While);
 
     while let Some(c) = source_stream.next() {
         match c {
             // Simple single-character tokens
-            '(' => tokens.push(Token::LeftParen),
-            ')' => tokens.push(Token::RightParen),
-            '{' => tokens.push(Token::LeftBrace),
-            '}' => tokens.push(Token::RightBrace),
-            ',' => tokens.push(Token::Comma),
-            '.' => tokens.push(Token::Dot),
-            '-' => tokens.push(Token::Minus),
-            '+' => tokens.push(Token::Plus),
-            ';' => tokens.push(Token::Semicolon),
-            '*' => tokens.push(Token::Star),
+            '(' => tokens.push(Token::new(
+                TokenType::LeftParen,
+                String::from('('),
+                LiteralValue::Null,
+                line,
+            )),
+            ')' => tokens.push(Token::new(
+                TokenType::RightParen,
+                String::from(')'),
+                LiteralValue::Null,
+                line,
+            )),
+            '{' => tokens.push(Token::new(
+                TokenType::LeftBrace,
+                String::from('{'),
+                LiteralValue::Null,
+                line,
+            )),
+            '}' => tokens.push(Token::new(
+                TokenType::RightBrace,
+                String::from('}'),
+                LiteralValue::Null,
+                line,
+            )),
+            ',' => tokens.push(Token::new(
+                TokenType::Comma,
+                String::from(','),
+                LiteralValue::Null,
+                line,
+            )),
+            '.' => tokens.push(Token::new(
+                TokenType::Dot,
+                String::from('.'),
+                LiteralValue::Null,
+                line,
+            )),
+            '-' => tokens.push(Token::new(
+                TokenType::Minus,
+                String::from('-'),
+                LiteralValue::Null,
+                line,
+            )),
+            '+' => tokens.push(Token::new(
+                TokenType::Plus,
+                String::from('+'),
+                LiteralValue::Null,
+                line,
+            )),
+            ';' => tokens.push(Token::new(
+                TokenType::Semicolon,
+                String::from(';'),
+                LiteralValue::Null,
+                line,
+            )),
+            '*' => tokens.push(Token::new(
+                TokenType::Star,
+                String::from('*'),
+                LiteralValue::Null,
+                line,
+            )),
 
             // Single- or double-character tokens, inc. comments
             '!' => match source_stream.peek() {
                 Some('=') => {
                     source_stream.next();
-                    tokens.push(Token::BangEqual);
+                    tokens.push(Token::new(
+                        TokenType::BangEqual,
+                        String::from("!="),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
                 _ => {
-                    tokens.push(Token::Bang);
+                    tokens.push(Token::new(
+                        TokenType::Bang,
+                        String::from("!"),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
             },
             '=' => match source_stream.peek() {
                 Some('=') => {
                     source_stream.next();
-                    tokens.push(Token::EqualEqual);
+                    tokens.push(Token::new(
+                        TokenType::EqualEqual,
+                        String::from("=="),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
                 _ => {
-                    tokens.push(Token::Equal);
+                    tokens.push(Token::new(
+                        TokenType::Equal,
+                        String::from("="),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
             },
             '<' => match source_stream.peek() {
                 Some('=') => {
                     source_stream.next();
-                    tokens.push(Token::LessEqual);
+                    tokens.push(Token::new(
+                        TokenType::LessEqual,
+                        String::from("<="),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
                 _ => {
-                    tokens.push(Token::Less);
+                    tokens.push(Token::new(
+                        TokenType::Less,
+                        String::from("<"),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
             },
             '>' => match source_stream.peek() {
                 Some('=') => {
                     source_stream.next();
-                    tokens.push(Token::GreaterEqual);
+                    tokens.push(Token::new(
+                        TokenType::GreaterEqual,
+                        String::from(">="),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
                 _ => {
-                    tokens.push(Token::Greater);
+                    tokens.push(Token::new(
+                        TokenType::Greater,
+                        String::from(">"),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
             },
             '/' => match source_stream.peek() {
@@ -93,7 +183,12 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
                     source_stream.reset_peek();
                 }
                 _ => {
-                    tokens.push(Token::Slash);
+                    tokens.push(Token::new(
+                        TokenType::Slash,
+                        String::from("/"),
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
             },
 
@@ -118,7 +213,7 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
                 source_stream.reset_peek();
 
                 if source_stream.peek().is_none() {
-                    eprintln!("[line {line}] Error: Unterminated string.");
+                    eprintln!("[line {line}] Error: Unexpected EOF.");
                     had_error = true;
                 } else {
                     // Consume the last '"'
@@ -126,7 +221,12 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
                     lexeme.push('"');
                     let literal = lexeme.trim_matches('"').to_string();
                     // Push token
-                    tokens.push(Token::String(lexeme, literal));
+                    tokens.push(Token::new(
+                        TokenType::String,
+                        lexeme,
+                        LiteralValue::from(literal),
+                        line,
+                    ));
                 }
             }
 
@@ -148,9 +248,21 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
                     }
                 }
 
-                let literal = lexeme.parse::<f64>().unwrap();
+                let literal = match lexeme.parse::<f64>() {
+                    Ok(x) => x,
+                    Err(e) => {
+                        eprintln!("[line {line}] Error: {e}");
+                        had_error = true;
+                        continue;
+                    }
+                };
 
-                tokens.push(Token::Number(lexeme, literal));
+                tokens.push(Token::new(
+                    TokenType::Number,
+                    lexeme,
+                    LiteralValue::from(literal),
+                    line,
+                ));
             }
 
             // Identifiers and reserved words
@@ -162,9 +274,15 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
                 source_stream.reset_peek();
 
                 if keywords.contains_key(lexeme.as_str()) {
-                    tokens.push(keywords.get(lexeme.as_str()).unwrap().clone());
+                    let token_type = keywords.get(lexeme.as_str()).unwrap().clone();
+                    tokens.push(Token::new(token_type, lexeme, LiteralValue::Null, line));
                 } else {
-                    tokens.push(Token::Identifier(lexeme));
+                    tokens.push(Token::new(
+                        TokenType::Identifier,
+                        lexeme,
+                        LiteralValue::Null,
+                        line,
+                    ));
                 }
             }
 
@@ -176,7 +294,12 @@ pub fn scan(source: String) -> (Vec<Token>, bool) {
         }
     }
 
-    tokens.push(Token::EOF);
+    tokens.push(Token::new(
+        TokenType::EOF,
+        String::new(),
+        LiteralValue::Null,
+        line,
+    ));
 
     (tokens, had_error)
 }

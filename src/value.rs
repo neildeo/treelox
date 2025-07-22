@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::token::Token;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     True,
@@ -52,12 +54,14 @@ impl From<bool> for Value {
 
 #[derive(Debug)]
 pub struct TypeError {
-    message: String,
+    pub token: Token,
+    pub message: String,
 }
 
 impl TypeError {
-    pub fn new(message: &str) -> Self {
+    pub fn new(token: Token, message: &str) -> Self {
         TypeError {
+            token,
             message: message.to_string(),
         }
     }
@@ -65,28 +69,32 @@ impl TypeError {
 
 impl Display for TypeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Type error: {}", self.message)
+        write!(
+            f,
+            "[line {}] Type error at '{}': {}",
+            self.token.line, self.token, self.message
+        )
     }
 }
 
 impl TryFrom<Value> for f64 {
-    type Error = TypeError;
+    type Error = String;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Number(x) => Ok(x),
-            v => Err(TypeError::new(&format!("Value {v:?} is not a number"))),
+            v => Err(format!("Value {v:?} is not a number")),
         }
     }
 }
 
 impl TryFrom<Value> for String {
-    type Error = TypeError;
+    type Error = String;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::String(s) => Ok(s),
-            v => Err(TypeError::new(&format!("Value {v:?} is not a string"))),
+            v => Err(format!("Value {v:?} is not a string")),
         }
     }
 }
