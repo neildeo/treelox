@@ -8,13 +8,13 @@ use crate::{
 };
 
 pub struct Interpreter {
-    env: Environment,
+    env: Environment<'static>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            env: Environment::new(),
+            env: Environment::new(None),
         }
     }
 

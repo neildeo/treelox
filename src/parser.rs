@@ -1,5 +1,5 @@
 use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
-use crate::stmt::{Expression, Print, Stmt, Var};
+use crate::stmt::{Block, Expression, Print, Stmt, Var};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
 use std::error::Error;
@@ -219,6 +219,11 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<d
             tokens.next();
             print_statement(tokens)
         }
+        TokenType::LeftBrace => {
+            // Consume LEFTBRACE
+            tokens.next();
+            Ok(Box::new(Block::new(block(tokens)?)))
+        }
         _ => expression_statement(tokens),
     }
 }
@@ -230,6 +235,23 @@ fn expression_statement(
     consume(tokens, TokenType::Semicolon, "Expect ';' after expression.")?;
 
     Ok(Box::new(Expression::new(expr)))
+}
+
+/// NOTE: this returns the raw list of statements, and delegates wrapping into a Block struct
+/// to the calling method. This is so this function can also be used to parse function bodies.
+fn block(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Vec<Box<dyn Stmt>>> {
+    let mut statements = Vec::new();
+
+    while tokens
+        .peek()
+        .is_some_and(|t| !matches!(t.token_type, TokenType::RightBrace | TokenType::EOF))
+    {
+        statements.push(declaration(tokens)?);
+    }
+
+    consume(tokens, TokenType::RightBrace, "Expect '}' after block.")?;
+
+    Ok(statements)
 }
 
 fn print_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {

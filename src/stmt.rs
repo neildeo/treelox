@@ -9,6 +9,12 @@ pub trait Stmt {
     fn interpret(&self, env: &mut Environment) -> Result<Option<Value>>;
 }
 
+impl Stmt for Box<dyn Stmt> {
+    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
+        (**self).interpret(env)
+    }
+}
+
 pub struct Expression {
     expression: Box<dyn Expr>,
 }
@@ -71,8 +77,24 @@ impl Stmt for Var {
     }
 }
 
-impl Stmt for Box<dyn Stmt> {
+pub struct Block {
+    statements: Vec<Box<dyn Stmt>>,
+}
+
+impl Block {
+    pub fn new(statements: Vec<Box<dyn Stmt>>) -> Self {
+        Block { statements }
+    }
+}
+
+impl Stmt for Block {
     fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
-        (**self).interpret(env)
+        let mut block_scope = Environment::new(Some(env));
+        let mut value = None;
+        for stmt in &self.statements {
+            value = stmt.interpret(&mut block_scope)?;
+        }
+
+        Ok(value)
     }
 }

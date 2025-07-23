@@ -1,5 +1,10 @@
 var x = 1;
 var y = 2;
 print x / y;
-x = y = 2;
+{
+    x = y = 2;
+    print "Inner scope";
+    print x * y;
+}
+print "Outer scope";
 print x * y;
