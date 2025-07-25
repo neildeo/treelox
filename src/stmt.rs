@@ -7,6 +7,7 @@ pub enum Stmt {
     Print(Print),
     Var(Var),
     Block(Block),
+    If(If),
 }
 
 pub struct Expression {
@@ -49,5 +50,21 @@ pub struct Block {
 impl Block {
     pub fn new(statements: Vec<Stmt>) -> Self {
         Block { statements }
+    }
+}
+
+pub struct If {
+    pub condition: Expr,
+    pub body: Box<Stmt>,
+    pub else_stmt: Option<Box<Stmt>>,
+}
+
+impl If {
+    pub fn new(condition: Expr, body: Stmt, else_stmt: Option<Stmt>) -> Self {
+        If {
+            condition,
+            body: Box::new(body),
+            else_stmt: else_stmt.map(Box::new),
+        }
     }
 }

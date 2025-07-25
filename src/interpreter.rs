@@ -41,6 +41,7 @@ impl Interpreter {
             Stmt::Print(print) => self.interpret_stmt_print(print),
             Stmt::Var(var) => self.interpret_stmt_var(var),
             Stmt::Block(block) => self.interpret_stmt_block(block),
+            Stmt::If(if_stmt) => self.interpret_stmt_if(if_stmt),
         }
     }
 
@@ -82,6 +83,16 @@ impl Interpreter {
         let maybe_value = self.interpret(stmt.statements);
         self.env = outer;
         maybe_value
+    }
+
+    fn interpret_stmt_if(&mut self, stmt: stmt::If) -> Result<Option<Value>> {
+        if self.interpret_expr(stmt.condition)?.is_truthy() {
+            self.interpret_stmt(*stmt.body)
+        } else if let Some(else_stmt) = stmt.else_stmt {
+            self.interpret_stmt(*else_stmt)
+        } else {
+            Ok(None)
+        }
     }
 
     fn interpret_expr_binary(&mut self, expr: expr::Binary) -> Result<Value> {

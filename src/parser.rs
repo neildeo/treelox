@@ -1,5 +1,5 @@
 use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
-use crate::stmt::{Block, Expression, Print, Stmt, Var};
+use crate::stmt::{Block, Expression, If, Print, Stmt, Var};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
 use std::error::Error;
@@ -224,8 +224,36 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt>
             tokens.next();
             Ok(Stmt::Block(Block::new(block(tokens)?)))
         }
+        TokenType::If => {
+            // Consume IF
+            tokens.next();
+            if_statement(tokens)
+        }
         _ => expression_statement(tokens),
     }
+}
+
+fn if_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
+    consume(tokens, TokenType::LeftParen, "Expect '(' after 'if'.")?;
+    let condition = expression(tokens)?;
+    consume(
+        tokens,
+        TokenType::RightParen,
+        "Expect ')' after if condition.",
+    )?;
+
+    let body = statement(tokens)?;
+    let else_stmt = if tokens
+        .peek()
+        .is_some_and(|t| t.token_type == TokenType::Else)
+    {
+        tokens.next();
+        Some(statement(tokens)?)
+    } else {
+        None
+    };
+
+    Ok(Stmt::If(If::new(condition, body, else_stmt)))
 }
 
 fn expression_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {

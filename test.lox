@@ -1,11 +1,6 @@
 var x = 1;
 var y = 100;
-print x / y;
-{
-    var x = 2;
-    var y = 2;
-    print "Inner scope";
-    print x * y;
-}
-print "Outer scope";
-print x * y;
+if (x <= y) 
+    print "Bigger!";
+else
+    print "Smaller!";
