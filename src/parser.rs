@@ -261,8 +261,78 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt>
             tokens.next();
             while_statement(tokens)
         }
+        TokenType::For => {
+            // Consume FOR
+            tokens.next();
+            for_statement(tokens)
+        }
         _ => expression_statement(tokens),
     }
+}
+
+fn for_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
+    consume(tokens, TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+    let initialiser = if tokens
+        .peek()
+        .is_some_and(|t| t.token_type == TokenType::Semicolon)
+    {
+        tokens.next();
+        None
+    } else if tokens
+        .peek()
+        .is_some_and(|t| t.token_type == TokenType::Var)
+    {
+        Some(var_declaration(tokens)?)
+    } else {
+        Some(expression_statement(tokens)?)
+    };
+
+    let condition = if tokens
+        .peek()
+        .is_some_and(|t| t.token_type == TokenType::Semicolon)
+    {
+        None
+    } else {
+        Some(expression(tokens)?)
+    };
+    consume(
+        tokens,
+        TokenType::Semicolon,
+        "Expect ';' after loop condition",
+    )?;
+
+    let increment = if tokens
+        .peek()
+        .is_some_and(|t| t.token_type == TokenType::RightParen)
+    {
+        None
+    } else {
+        Some(expression(tokens)?)
+    };
+    consume(
+        tokens,
+        TokenType::RightParen,
+        "Expect ')' after for clauses.",
+    )?;
+
+    let mut body = statement(tokens)?;
+
+    if let Some(incr) = increment {
+        body = Stmt::Block(Block::new(vec![
+            body,
+            Stmt::Expression(Expression::new(incr)),
+        ]));
+    }
+
+    let condition = condition.unwrap_or(Expr::Literal(Literal::new(Value::True)));
+    body = Stmt::While(While::new(condition, body));
+
+    if let Some(init) = initialiser {
+        body = Stmt::Block(Block::new(vec![init, body]));
+    }
+
+    Ok(body)
 }
 
 fn while_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
