@@ -1,62 +1,40 @@
-use crate::environment::Environment;
 use crate::expr::Expr;
-use crate::interpreter::Result;
 use crate::token::{Token, TokenType};
-use crate::value::Value;
 use core::panic;
 
-pub trait Stmt {
-    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>>;
-}
-
-impl Stmt for Box<dyn Stmt> {
-    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
-        (**self).interpret(env)
-    }
+pub enum Stmt {
+    Expression(Expression),
+    Print(Print),
+    Var(Var),
+    Block(Block),
 }
 
 pub struct Expression {
-    expression: Box<dyn Expr>,
+    pub expression: Expr,
 }
 
 impl Expression {
-    pub fn new(expression: Box<dyn Expr>) -> Self {
+    pub fn new(expression: Expr) -> Self {
         Expression { expression }
     }
 }
-
-impl Stmt for Expression {
-    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
-        let value = self.expression.interpret(env)?;
-        Ok(Some(value))
-    }
-}
-
 pub struct Print {
-    expression: Box<dyn Expr>,
+    pub expression: Expr,
 }
 
 impl Print {
-    pub fn new(expression: Box<dyn Expr>) -> Self {
+    pub fn new(expression: Expr) -> Self {
         Print { expression }
     }
 }
 
-impl Stmt for Print {
-    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
-        let value = self.expression.interpret(env)?;
-        println!("{}", value);
-        Ok(None)
-    }
-}
-
 pub struct Var {
-    name: Token,
-    initialiser: Option<Box<dyn Expr>>,
+    pub name: Token,
+    pub initialiser: Option<Expr>,
 }
 
 impl Var {
-    pub fn new(name: Token, initialiser: Option<Box<dyn Expr>>) -> Self {
+    pub fn new(name: Token, initialiser: Option<Expr>) -> Self {
         match name.token_type {
             TokenType::Identifier => Var { name, initialiser },
             _ => panic!("Variable name token is not an identifier."),
@@ -64,37 +42,12 @@ impl Var {
     }
 }
 
-impl Stmt for Var {
-    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
-        let value = match &self.initialiser {
-            Some(expr) => expr.interpret(env)?,
-            None => crate::value::Value::Nil,
-        };
-
-        env.define(self.name.clone(), value);
-
-        Ok(None)
-    }
-}
-
 pub struct Block {
-    statements: Vec<Box<dyn Stmt>>,
+    pub statements: Vec<Stmt>,
 }
 
 impl Block {
-    pub fn new(statements: Vec<Box<dyn Stmt>>) -> Self {
+    pub fn new(statements: Vec<Stmt>) -> Self {
         Block { statements }
-    }
-}
-
-impl Stmt for Block {
-    fn interpret(&self, env: &mut Environment) -> Result<Option<Value>> {
-        let mut block_scope = Environment::new(Some(env));
-        let mut value = None;
-        for stmt in &self.statements {
-            value = stmt.interpret(&mut block_scope)?;
-        }
-
-        Ok(value)
     }
 }

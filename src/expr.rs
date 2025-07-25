@@ -1,131 +1,87 @@
 use crate::{
-    environment::Environment,
-    interpreter::Result,
     token::{Token, TokenType},
-    value::{TypeError, Value},
+    value::Value,
 };
 use core::panic;
 use std::fmt::Display;
 
-pub trait GetName {
-    fn get_name(&self) -> Option<Token> {
-        None
-    }
+#[derive(Debug)]
+pub enum Expr {
+    Binary(Binary),
+    Grouping(Grouping),
+    Literal(Literal),
+    Unary(Unary),
+    Variable(Variable),
+    Assign(Assign),
 }
 
-pub trait Expr: Display + GetName {
-    fn interpret(&self, env: &mut Environment) -> Result<Value>;
-}
-
-pub struct Binary<L: Expr, R: Expr> {
-    pub left: L,
-    pub operator: Token,
-    pub right: R,
-}
-
-impl<L: Expr, R: Expr> Binary<L, R> {
-    pub fn new(left: L, operator: Token, right: R) -> Self {
-        Binary {
-            left,
-            operator,
-            right,
+impl Expr {
+    pub fn get_name(&self) -> Option<Token> {
+        match self {
+            Expr::Variable(var) => Some(var.name.clone()),
+            _ => None,
         }
     }
 }
 
-impl<L: Expr, R: Expr> Display for Binary<L, R> {
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Expr::Binary(binary) => binary.to_string(),
+            Expr::Grouping(grouping) => grouping.to_string(),
+            Expr::Literal(literal) => literal.to_string(),
+            Expr::Unary(unary) => unary.to_string(),
+            Expr::Variable(variable) => variable.to_string(),
+            Expr::Assign(assign) => assign.to_string(),
+        };
+
+        write!(f, "{}", str)
+    }
+}
+
+#[derive(Debug)]
+pub struct Binary {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
+}
+
+impl Binary {
+    pub fn new(left: Expr, operator: Token, right: Expr) -> Self {
+        Binary {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
+        }
+    }
+}
+
+impl Display for Binary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.operator, self.left, self.right)
     }
 }
 
-impl<L: Expr, R: Expr> GetName for Binary<L, R> {}
+#[derive(Debug)]
+pub struct Grouping {
+    pub expr: Box<Expr>,
+}
 
-impl<L: Expr, R: Expr> Expr for Binary<L, R> {
-    fn interpret(&self, env: &mut Environment) -> Result<Value> {
-        let left = self.left.interpret(env)?;
-        let right = self.right.interpret(env)?;
-
-        match self.operator.token_type {
-            TokenType::Minus => Ok(Value::Number(
-                f64::try_from(left).map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                    - f64::try_from(right)
-                        .map_err(|e| TypeError::new(self.operator.clone(), &e))?,
-            )),
-            TokenType::Slash => Ok(Value::Number(
-                f64::try_from(left).map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                    / f64::try_from(right)
-                        .map_err(|e| TypeError::new(self.operator.clone(), &e))?,
-            )),
-            TokenType::Star => Ok(Value::Number(
-                f64::try_from(left).map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                    * f64::try_from(right)
-                        .map_err(|e| TypeError::new(self.operator.clone(), &e))?,
-            )),
-            TokenType::Plus => {
-                if left.is_number() && right.is_number() {
-                    Ok(Value::Number(
-                        f64::try_from(left).unwrap() + f64::try_from(right).unwrap(),
-                    ))
-                } else if left.is_string() && right.is_string() {
-                    let s =
-                        String::try_from(left).unwrap() + String::try_from(right).unwrap().as_str();
-                    Ok(Value::String(s))
-                } else {
-                    Err(TypeError::new(
-                        self.operator.clone(),
-                        &format!("Cannot add values {left:?} and {right:?}"),
-                    )
-                    .into())
-                }
-            }
-            TokenType::Greater => Ok((f64::try_from(left)
-                .map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                > f64::try_from(right).map_err(|e| TypeError::new(self.operator.clone(), &e))?)
-            .into()),
-            TokenType::GreaterEqual => Ok((f64::try_from(left)
-                .map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                >= f64::try_from(right).map_err(|e| TypeError::new(self.operator.clone(), &e))?)
-            .into()),
-            TokenType::Less => Ok((f64::try_from(left)
-                .map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                < f64::try_from(right).map_err(|e| TypeError::new(self.operator.clone(), &e))?)
-            .into()),
-            TokenType::LessEqual => Ok((f64::try_from(left)
-                .map_err(|e| TypeError::new(self.operator.clone(), &e))?
-                <= f64::try_from(right).map_err(|e| TypeError::new(self.operator.clone(), &e))?)
-            .into()),
-            TokenType::BangEqual => Ok((!left.is_equal(&right)).into()),
-            TokenType::EqualEqual => Ok(left.is_equal(&right).into()),
-            _ => todo!(),
+impl Grouping {
+    pub fn new(expr: Expr) -> Self {
+        Grouping {
+            expr: Box::new(expr),
         }
     }
 }
 
-pub struct Grouping<E: Expr> {
-    pub expr: E,
-}
-
-impl<E: Expr> Grouping<E> {
-    pub fn new(expr: E) -> Self {
-        Grouping { expr }
-    }
-}
-
-impl<E: Expr> Display for Grouping<E> {
+impl Display for Grouping {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(group {})", self.expr)
     }
 }
 
-impl<E: Expr> GetName for Grouping<E> {}
-
-impl<E: Expr> Expr for Grouping<E> {
-    fn interpret(&self, env: &mut Environment) -> Result<Value> {
-        self.expr.interpret(env)
-    }
-}
-
+#[derive(Debug)]
 pub struct Literal {
     pub value: Value,
 }
@@ -142,60 +98,28 @@ impl Display for Literal {
     }
 }
 
-impl GetName for Literal {}
-
-impl Expr for Literal {
-    fn interpret(&self, _env: &mut Environment) -> Result<Value> {
-        Ok(self.value.clone())
-    }
-}
-
-pub struct Unary<E: Expr> {
+#[derive(Debug)]
+pub struct Unary {
     pub operator: Token,
-    pub expr: E,
+    pub expr: Box<Expr>,
 }
 
-impl<E: Expr> Unary<E> {
-    pub fn new(operator: Token, expr: E) -> Self {
-        Unary { operator, expr }
+impl Unary {
+    pub fn new(operator: Token, expr: Expr) -> Self {
+        Unary {
+            operator,
+            expr: Box::new(expr),
+        }
     }
 }
 
-impl<E: Expr> Display for Unary<E> {
+impl Display for Unary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {})", self.operator, self.expr)
     }
 }
 
-impl<E: Expr> GetName for Unary<E> {}
-
-impl<E: Expr> Expr for Unary<E> {
-    fn interpret(&self, env: &mut Environment) -> Result<Value> {
-        let right = self.expr.interpret(env)?;
-
-        match self.operator.token_type {
-            TokenType::Minus => match right {
-                Value::Number(x) => Ok(Value::Number(-x)),
-                v => panic!("Cannot negate value {v:?}"),
-            },
-            TokenType::Bang => Ok((!right.is_truthy()).into()),
-            _ => panic!("Unrecognised unary operator: {:?}", self.operator),
-        }
-    }
-}
-
-impl GetName for Box<dyn Expr> {
-    fn get_name(&self) -> Option<Token> {
-        (**self).get_name()
-    }
-}
-
-impl Expr for Box<dyn Expr> {
-    fn interpret(&self, env: &mut Environment) -> Result<Value> {
-        (**self).interpret(env)
-    }
-}
-
+#[derive(Debug)]
 pub struct Variable {
     pub name: Token,
 }
@@ -215,43 +139,23 @@ impl Display for Variable {
     }
 }
 
-impl GetName for Variable {
-    fn get_name(&self) -> Option<Token> {
-        Some(self.name.clone())
-    }
-}
-
-impl Expr for Variable {
-    fn interpret(&self, env: &mut Environment) -> Result<Value> {
-        env.get(&self.name).cloned()
-    }
-}
-
-pub struct Assign<T: Expr> {
+#[derive(Debug)]
+pub struct Assign {
     pub name: Token,
-    pub value: T,
+    pub value: Box<Expr>,
 }
 
-impl<T: Expr> Assign<T> {
-    pub fn new(name: Token, value: T) -> Self {
-        Assign { name, value }
+impl Assign {
+    pub fn new(name: Token, value: Expr) -> Self {
+        Assign {
+            name,
+            value: Box::new(value),
+        }
     }
 }
 
-impl<T: Expr> Display for Assign<T> {
+impl Display for Assign {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} = {}", self.name, self.value)
-    }
-}
-
-impl<T: Expr> GetName for Assign<T> {}
-
-impl<T: Expr> Expr for Assign<T> {
-    fn interpret(&self, env: &mut Environment) -> Result<Value> {
-        let value = self.value.interpret(env)?;
-
-        env.assign(self.name.clone(), value.clone())?;
-
-        Ok(value)
     }
 }

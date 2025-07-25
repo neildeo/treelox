@@ -1,17 +1,24 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{interpreter::RuntimeError, token::Token, value::Value};
 
-pub struct Environment<'a> {
+pub struct Environment {
     values: HashMap<String, Value>,
-    enclosing: Option<&'a mut Environment<'a>>,
+    enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
-impl<'a> Environment<'a> {
-    pub fn new(enclosing: Option<&'a mut Environment<'a>>) -> Self {
+impl Environment {
+    pub fn new() -> Self {
         Environment {
             values: HashMap::new(),
-            enclosing,
+            enclosing: None,
+        }
+    }
+
+    pub fn new_with_enclosing(enclosing: &Rc<RefCell<Environment>>) -> Self {
+        Environment {
+            values: HashMap::new(),
+            enclosing: Some(enclosing.clone()),
         }
     }
 
@@ -19,19 +26,17 @@ impl<'a> Environment<'a> {
         self.values.insert(name.lexeme, value);
     }
 
-    pub fn get(&self, name: &Token) -> Result<&Value, RuntimeError> {
-        match self.values.get(&name.lexeme) {
-            Some(value) => Ok(value),
-            None => {
-                if let Some(encl) = &self.enclosing {
-                    encl.get(name)
-                } else {
-                    Err(RuntimeError::new(
-                        name.clone(),
-                        &format!("Undefined variable '{}'.", name.lexeme),
-                    ))
-                }
-            }
+    pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
+        let key = &name.lexeme;
+        if let Some(value) = self.values.get(key) {
+            Ok(value.clone())
+        } else if let Some(outer) = &self.enclosing {
+            outer.borrow().get(name)
+        } else {
+            Err(RuntimeError::new(
+                name.clone(),
+                &format!("Undefined variable '{}'.", name.lexeme),
+            ))
         }
     }
 
@@ -42,8 +47,8 @@ impl<'a> Environment<'a> {
                 Ok(())
             }
             false => {
-                if let Some(encl) = &mut self.enclosing {
-                    encl.assign(name, value)
+                if let Some(outer) = &self.enclosing {
+                    outer.borrow_mut().assign(name, value)
                 } else {
                     Err(RuntimeError::new(
                         name.clone(),

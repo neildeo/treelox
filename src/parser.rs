@@ -47,9 +47,9 @@ impl Error for ParseError {}
 
 pub type Result<T> = std::result::Result<T, ParseError>;
 
-pub fn parse(tokens: Vec<Token>) -> Vec<Box<dyn Stmt>> {
+pub fn parse(tokens: Vec<Token>) -> Vec<Stmt> {
     let mut tokens = tokens.into_iter().peekable();
-    let mut statements = Vec::<Box<dyn Stmt>>::new();
+    let mut statements = Vec::new();
 
     while let Some(token) = tokens.peek() {
         if token.token_type == TokenType::EOF {
@@ -78,31 +78,31 @@ pub fn consume(
     Ok(token)
 }
 
-fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let t = tokens.next().ok_or(ParseError::unexpected_eof())?;
-    let result: Result<Box<dyn Expr>> = match t.token_type {
-        TokenType::True => Ok(Box::new(Literal::new(Value::True))),
-        TokenType::False => Ok(Box::new(Literal::new(Value::False))),
-        TokenType::Nil => Ok(Box::new(Literal::new(Value::Nil))),
+    let result: Result<Expr> = match t.token_type {
+        TokenType::True => Ok(Expr::Literal(Literal::new(Value::True))),
+        TokenType::False => Ok(Expr::Literal(Literal::new(Value::False))),
+        TokenType::Nil => Ok(Expr::Literal(Literal::new(Value::Nil))),
         TokenType::String => match String::try_from(t.literal.clone()) {
-            Ok(s) => Ok(Box::new(Literal::new(Value::String(s)))),
+            Ok(s) => Ok(Expr::Literal(Literal::new(Value::String(s)))),
             Err(e) => Err(ParseError::new(t, &e)),
         },
         TokenType::Number => match f64::try_from(t.literal.clone()) {
-            Ok(x) => Ok(Box::new(Literal::new(Value::Number(x)))),
+            Ok(x) => Ok(Expr::Literal(Literal::new(Value::Number(x)))),
             Err(e) => Err(ParseError::new(t, &e)),
         },
         TokenType::LeftParen => {
             let expr = expression(tokens)?;
             match tokens.next() {
                 Some(t) if t.token_type == TokenType::RightParen => {
-                    Ok(Box::new(Grouping::new(expr)))
+                    Ok(Expr::Grouping(Grouping::new(expr)))
                 }
                 Some(t) => Err(ParseError::new(t, "Expected closing parenthesis.")),
                 None => Err(ParseError::unexpected_eof()),
             }
         }
-        TokenType::Identifier => Ok(Box::new(Variable::new(t))),
+        TokenType::Identifier => Ok(Expr::Variable(Variable::new(t))),
         _ => Err(ParseError::new(t, "Unexpected token in expression")),
     };
 
@@ -113,20 +113,20 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn
     result
 }
 
-fn unary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn unary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     if tokens
         .peek()
         .is_some_and(|t| t.token_type == TokenType::Bang || t.token_type == TokenType::Minus)
     {
         let operator = tokens.next().unwrap();
         let expr = unary(tokens)?;
-        return Ok(Box::new(Unary::new(operator, expr)));
+        return Ok(Expr::Unary(Unary::new(operator, expr)));
     }
 
     primary(tokens)
 }
 
-fn factor(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn factor(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let mut left = unary(tokens)?;
 
     while tokens
@@ -135,13 +135,13 @@ fn factor(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn 
     {
         let operator = tokens.next().unwrap();
         let right = unary(tokens)?;
-        left = Box::new(Binary::new(left, operator, right))
+        left = Expr::Binary(Binary::new(left, operator, right))
     }
 
     Ok(left)
 }
 
-fn term(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn term(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let mut left = factor(tokens)?;
 
     while tokens
@@ -150,13 +150,13 @@ fn term(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Ex
     {
         let operator = tokens.next().unwrap();
         let right = factor(tokens)?;
-        left = Box::new(Binary::new(left, operator, right))
+        left = Expr::Binary(Binary::new(left, operator, right))
     }
 
     Ok(left)
 }
 
-fn comparison(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn comparison(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let mut left = term(tokens)?;
 
     while tokens.peek().is_some_and(|t| {
@@ -167,13 +167,13 @@ fn comparison(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<
     }) {
         let operator = tokens.next().unwrap();
         let right = term(tokens)?;
-        left = Box::new(Binary::new(left, operator, right))
+        left = Expr::Binary(Binary::new(left, operator, right))
     }
 
     Ok(left)
 }
 
-fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let mut left = comparison(tokens)?;
 
     while tokens.peek().is_some_and(|t| {
@@ -181,13 +181,13 @@ fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dy
     }) {
         let operator = tokens.next().unwrap();
         let right = comparison(tokens)?;
-        left = Box::new(Binary::new(left, operator, right));
+        left = Expr::Binary(Binary::new(left, operator, right));
     }
 
     Ok(left)
 }
 
-fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let expr = equality(tokens)?;
 
     if tokens
@@ -198,7 +198,7 @@ fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<
         let value = assignment(tokens)?;
 
         if let Some(name) = expr.get_name() {
-            return Ok(Box::new(Assign::new(name, value)));
+            return Ok(Expr::Assign(Assign::new(name, value)));
         }
 
         return Err(ParseError::new(equals, "Invalid assignment target."));
@@ -207,11 +207,11 @@ fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<
     Ok(expr)
 }
 
-fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Expr>> {
+fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     assignment(tokens)
 }
 
-fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
     let t = tokens.peek().ok_or(ParseError::unexpected_eof())?;
     match t.token_type {
         TokenType::Print => {
@@ -222,24 +222,22 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<d
         TokenType::LeftBrace => {
             // Consume LEFTBRACE
             tokens.next();
-            Ok(Box::new(Block::new(block(tokens)?)))
+            Ok(Stmt::Block(Block::new(block(tokens)?)))
         }
         _ => expression_statement(tokens),
     }
 }
 
-fn expression_statement(
-    tokens: &mut Peekable<impl Iterator<Item = Token>>,
-) -> Result<Box<dyn Stmt>> {
+fn expression_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
     let expr = expression(tokens)?;
     consume(tokens, TokenType::Semicolon, "Expect ';' after expression.")?;
 
-    Ok(Box::new(Expression::new(expr)))
+    Ok(Stmt::Expression(Expression::new(expr)))
 }
 
 /// NOTE: this returns the raw list of statements, and delegates wrapping into a Block struct
 /// to the calling method. This is so this function can also be used to parse function bodies.
-fn block(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Vec<Box<dyn Stmt>>> {
+fn block(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Vec<Stmt>> {
     let mut statements = Vec::new();
 
     while tokens
@@ -254,14 +252,14 @@ fn block(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Vec<Box<d
     Ok(statements)
 }
 
-fn print_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+fn print_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
     let expr = expression(tokens)?;
     consume(tokens, TokenType::Semicolon, "Expect ';' after expression.")?;
 
-    Ok(Box::new(Print::new(expr)))
+    Ok(Stmt::Print(Print::new(expr)))
 }
 
-fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
     if tokens
         .peek()
         .is_some_and(|t| t.token_type == TokenType::Var)
@@ -279,7 +277,7 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box
     }
 }
 
-fn var_declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Box<dyn Stmt>> {
+fn var_declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
     consume(tokens, TokenType::Var, "Expect VAR keyword.")?;
 
     let name = consume(tokens, TokenType::Identifier, "Expect variable name")?;
@@ -298,7 +296,7 @@ fn var_declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
         TokenType::Semicolon,
         "Expect ';' after variable declaration.",
     )?;
-    Ok(Box::new(Var::new(name, initialiser)))
+    Ok(Stmt::Var(Var::new(name, initialiser)))
 }
 
 fn synchronise(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
