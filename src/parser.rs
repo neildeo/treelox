@@ -1,5 +1,5 @@
 use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable};
-use crate::stmt::{Block, Expression, If, Print, Stmt, Var};
+use crate::stmt::{Block, Expression, If, Print, Stmt, Var, While};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
 use std::error::Error;
@@ -256,8 +256,22 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt>
             tokens.next();
             if_statement(tokens)
         }
+        TokenType::While => {
+            // Consume WHILE
+            tokens.next();
+            while_statement(tokens)
+        }
         _ => expression_statement(tokens),
     }
+}
+
+fn while_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
+    consume(tokens, TokenType::LeftParen, "Expect '(' after 'while'.")?;
+    let condition = expression(tokens)?;
+    consume(tokens, TokenType::RightParen, "Expect ')' after 'while'.")?;
+    let body = statement(tokens)?;
+
+    Ok(Stmt::While(While::new(condition, body)))
 }
 
 fn if_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {

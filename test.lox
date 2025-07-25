@@ -1,8 +1,16 @@
 var x = 1;
 var y = 100;
+
 if (x <= y) 
     print "Bigger!";
 else
     print "Smaller!";
+
 if (true or 3 + "five")
     print "Short-circuited";
+
+var z = 5;
+while (z > 0) {
+    print z;
+    z = z - 1;
+}

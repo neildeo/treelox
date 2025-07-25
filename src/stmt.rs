@@ -8,6 +8,7 @@ pub enum Stmt {
     Var(Var),
     Block(Block),
     If(If),
+    While(While),
 }
 
 pub struct Expression {
@@ -65,6 +66,20 @@ impl If {
             condition,
             body: Box::new(body),
             else_stmt: else_stmt.map(Box::new),
+        }
+    }
+}
+
+pub struct While {
+    pub condition: Expr,
+    pub body: Box<Stmt>,
+}
+
+impl While {
+    pub fn new(condition: Expr, body: Stmt) -> Self {
+        While {
+            condition,
+            body: Box::new(body),
         }
     }
 }

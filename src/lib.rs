@@ -40,7 +40,7 @@ pub fn repl() -> ExitCode {
                     continue;
                 }
 
-                match interpreter.interpret(stmts) {
+                match interpreter.interpret(&stmts) {
                     Ok(maybe_val) => {
                         if let Some(val) = maybe_val {
                             println!("{val}");
@@ -86,7 +86,7 @@ pub fn interpret_file(filename: &Path) -> ExitCode {
         return ExitCode::from(65);
     }
 
-    match interpreter.interpret(stmts) {
+    match interpreter.interpret(&stmts) {
         Ok(_) => {}
         Err(e) => {
             eprintln!("{}", e);
