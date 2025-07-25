@@ -53,6 +53,7 @@ impl Interpreter {
             Expr::Unary(unary) => self.interpret_expr_unary(unary),
             Expr::Variable(variable) => self.interpret_expr_variable(variable),
             Expr::Assign(assign) => self.interpret_expr_assign(assign),
+            Expr::Logical(logical) => self.interpret_expr_logical(logical),
         }
     }
 
@@ -152,6 +153,20 @@ impl Interpreter {
             TokenType::EqualEqual => Ok(left.is_equal(&right).into()),
             _ => todo!(),
         }
+    }
+
+    fn interpret_expr_logical(&mut self, expr: expr::Logical) -> Result<Value> {
+        let left = self.interpret_expr(*expr.left)?;
+
+        if expr.operator.token_type == TokenType::Or {
+            if left.is_truthy() {
+                return Ok(left);
+            }
+        } else if !left.is_truthy() {
+            return Ok(left);
+        }
+
+        self.interpret_expr(*expr.right)
     }
 
     fn interpret_expr_grouping(&mut self, expr: expr::Grouping) -> Result<Value> {

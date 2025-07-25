@@ -4,3 +4,5 @@ if (x <= y)
     print "Bigger!";
 else
     print "Smaller!";
+if (true or 3 + "five")
+    print "Short-circuited";

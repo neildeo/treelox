@@ -13,6 +13,7 @@ pub enum Expr {
     Unary(Unary),
     Variable(Variable),
     Assign(Assign),
+    Logical(Logical),
 }
 
 impl Expr {
@@ -33,6 +34,7 @@ impl Display for Expr {
             Expr::Unary(unary) => unary.to_string(),
             Expr::Variable(variable) => variable.to_string(),
             Expr::Assign(assign) => assign.to_string(),
+            Expr::Logical(logical) => logical.to_string(),
         };
 
         write!(f, "{}", str)
@@ -157,5 +159,28 @@ impl Assign {
 impl Display for Assign {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} = {}", self.name, self.value)
+    }
+}
+
+#[derive(Debug)]
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
+}
+
+impl Logical {
+    pub fn new(left: Expr, operator: Token, right: Expr) -> Self {
+        Logical {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
+        }
+    }
+}
+
+impl Display for Logical {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.operator, self.left, self.right)
     }
 }

@@ -1,4 +1,4 @@
-use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::stmt::{Block, Expression, If, Print, Stmt, Var};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
@@ -188,7 +188,7 @@ fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> 
 }
 
 fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
-    let expr = equality(tokens)?;
+    let expr = or(tokens)?;
 
     if tokens
         .peek()
@@ -202,6 +202,33 @@ fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr
         }
 
         return Err(ParseError::new(equals, "Invalid assignment target."));
+    }
+
+    Ok(expr)
+}
+
+fn or(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
+    let mut expr = and(tokens)?;
+
+    while tokens.peek().is_some_and(|t| t.token_type == TokenType::Or) {
+        let operator = tokens.next().unwrap();
+        let right = comparison(tokens)?;
+        expr = Expr::Logical(Logical::new(expr, operator, right));
+    }
+
+    Ok(expr)
+}
+
+fn and(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
+    let mut expr = equality(tokens)?;
+
+    while tokens
+        .peek()
+        .is_some_and(|t| t.token_type == TokenType::And)
+    {
+        let operator = tokens.next().unwrap();
+        let right = comparison(tokens)?;
+        expr = Expr::Logical(Logical::new(expr, operator, right));
     }
 
     Ok(expr)
