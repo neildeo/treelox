@@ -1,6 +1,9 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::UNIX_EPOCH};
 
-use crate::token::Token;
+use crate::{
+    lox_callable::{LoxCallable, LoxFunction},
+    token::Token,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -9,6 +12,34 @@ pub enum Value {
     Nil,
     String(String),
     Number(f64),
+    Function(LoxFunction),
+    // Native functions
+    Clock(Clock),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Clock;
+
+impl LoxCallable for Clock {
+    fn call(
+        &self,
+        _interpreter: &mut crate::interpreter::Interpreter,
+        _args: &[Value],
+    ) -> crate::interpreter::Result<Value> {
+        let time = UNIX_EPOCH.elapsed().unwrap().as_secs_f64();
+
+        Ok(Value::Number(time))
+    }
+
+    fn arity(&self) -> usize {
+        0
+    }
+}
+
+impl Display for Clock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<native fn>clock")
+    }
 }
 
 impl Value {
@@ -19,6 +50,8 @@ impl Value {
             Value::Nil => false,
             Value::String(_) => true,
             Value::Number(_) => true,
+            Value::Clock(_) => true,
+            Value::Function(_) => true,
         }
     }
 
@@ -40,6 +73,10 @@ impl Value {
         }
 
         self == other
+    }
+
+    pub fn is_callable(&self) -> bool {
+        matches!(self, Value::Function(_) | Value::Clock(_))
     }
 }
 
@@ -106,7 +143,9 @@ impl Display for Value {
             Value::False => "false",
             Value::Nil => "nil",
             Value::String(s) => s,
-            Value::Number(x) => &format!("{x}"),
+            Value::Number(x) => &x.to_string(),
+            Value::Clock(clock) => &clock.to_string(),
+            Value::Function(lox_function) => &lox_function.to_string(),
         };
 
         write!(f, "{value_string}")

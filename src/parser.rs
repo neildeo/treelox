@@ -1,5 +1,5 @@
-use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable};
-use crate::stmt::{Block, Expression, If, Print, Stmt, Var, While};
+use crate::expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
+use crate::stmt::{Block, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
 use std::error::Error;
@@ -78,6 +78,13 @@ pub fn consume(
     Ok(token)
 }
 
+pub fn check_next(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+    token_type: TokenType,
+) -> bool {
+    tokens.peek().is_some_and(|t| t.token_type == token_type)
+}
+
 fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let t = tokens.next().ok_or(ParseError::unexpected_eof())?;
     let result: Result<Expr> = match t.token_type {
@@ -113,6 +120,47 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     result
 }
 
+fn call(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
+    let mut expr = primary(tokens)?;
+
+    loop {
+        if check_next(tokens, TokenType::LeftParen) {
+            // Consume the left paren
+            tokens.next();
+            expr = finish_call(tokens, expr)?;
+        } else {
+            break;
+        }
+    }
+
+    Ok(expr)
+}
+
+fn finish_call(tokens: &mut Peekable<impl Iterator<Item = Token>>, callee: Expr) -> Result<Expr> {
+    let mut args = Vec::new();
+
+    if tokens
+        .peek()
+        .is_some_and(|t| t.token_type != TokenType::RightParen)
+    {
+        args.push(expression(tokens)?);
+        while check_next(tokens, TokenType::Comma) {
+            if args.len() >= 255 {
+                return Err(ParseError::new(
+                    tokens.next().unwrap(),
+                    "Can't have more than 255 arguments.",
+                ));
+            }
+            tokens.next();
+            args.push(expression(tokens)?);
+        }
+    }
+
+    let paren = consume(tokens, TokenType::RightParen, "Expect ')' after arguments.")?;
+
+    Ok(Expr::Call(Call::new(callee, paren, args)))
+}
+
 fn unary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     if tokens
         .peek()
@@ -123,7 +171,7 @@ fn unary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
         return Ok(Expr::Unary(Unary::new(operator, expr)));
     }
 
-    primary(tokens)
+    call(tokens)
 }
 
 fn factor(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
@@ -190,10 +238,7 @@ fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> 
 fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let expr = or(tokens)?;
 
-    if tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::Equal)
-    {
+    if check_next(tokens, TokenType::Equal) {
         let equals = tokens.next().unwrap();
         let value = assignment(tokens)?;
 
@@ -210,7 +255,7 @@ fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr
 fn or(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let mut expr = and(tokens)?;
 
-    while tokens.peek().is_some_and(|t| t.token_type == TokenType::Or) {
+    while check_next(tokens, TokenType::Or) {
         let operator = tokens.next().unwrap();
         let right = comparison(tokens)?;
         expr = Expr::Logical(Logical::new(expr, operator, right));
@@ -222,10 +267,7 @@ fn or(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
 fn and(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr> {
     let mut expr = equality(tokens)?;
 
-    while tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::And)
-    {
+    while check_next(tokens, TokenType::And) {
         let operator = tokens.next().unwrap();
         let right = comparison(tokens)?;
         expr = Expr::Logical(Logical::new(expr, operator, right));
@@ -266,6 +308,7 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt>
             tokens.next();
             for_statement(tokens)
         }
+        TokenType::Return => return_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -279,19 +322,13 @@ fn for_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<S
     {
         tokens.next();
         None
-    } else if tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::Var)
-    {
+    } else if check_next(tokens, TokenType::Var) {
         Some(var_declaration(tokens)?)
     } else {
         Some(expression_statement(tokens)?)
     };
 
-    let condition = if tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::Semicolon)
-    {
+    let condition = if check_next(tokens, TokenType::Semicolon) {
         None
     } else {
         Some(expression(tokens)?)
@@ -302,10 +339,7 @@ fn for_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<S
         "Expect ';' after loop condition",
     )?;
 
-    let increment = if tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::RightParen)
-    {
+    let increment = if check_next(tokens, TokenType::RightParen) {
         None
     } else {
         Some(expression(tokens)?)
@@ -354,10 +388,7 @@ fn if_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<St
     )?;
 
     let body = statement(tokens)?;
-    let else_stmt = if tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::Else)
-    {
+    let else_stmt = if check_next(tokens, TokenType::Else) {
         tokens.next();
         Some(statement(tokens)?)
     } else {
@@ -398,12 +429,51 @@ fn print_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
     Ok(Stmt::Print(Print::new(expr)))
 }
 
-fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
-    if tokens
+fn return_statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
+    //   private Stmt returnStatement() {
+    //     Token keyword = previous();
+    //     Expr value = null;
+    //     if (!check(SEMICOLON)) {
+    //       value = expression();
+    //     }
+
+    //     consume(SEMICOLON, "Expect ';' after return value.");
+    //     return new Stmt.Return(keyword, value);
+    //   }
+
+    // Unwrap is safe since this function is called only when "RETURN" has
+    // been detected and not yet consumed
+    let token = tokens.next().unwrap();
+    let value = if tokens
         .peek()
-        .is_some_and(|t| t.token_type == TokenType::Var)
+        .is_some_and(|t| t.token_type != TokenType::Semicolon)
     {
+        expression(tokens)?
+    } else {
+        Expr::Literal(Literal::new(Value::Nil))
+    };
+
+    consume(
+        tokens,
+        TokenType::Semicolon,
+        "Expect ';' after return value.",
+    )?;
+
+    Ok(Stmt::Return(Return::new(token, value)))
+}
+
+fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt> {
+    if check_next(tokens, TokenType::Var) {
         match var_declaration(tokens) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                println!("{}", &e);
+                synchronise(tokens);
+                Err(e)
+            }
+        }
+    } else if check_next(tokens, TokenType::Fun) {
+        match function_declaration(tokens, "function") {
             Ok(v) => Ok(v),
             Err(e) => {
                 println!("{}", &e);
@@ -420,10 +490,7 @@ fn var_declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
     consume(tokens, TokenType::Var, "Expect VAR keyword.")?;
 
     let name = consume(tokens, TokenType::Identifier, "Expect variable name")?;
-    let initialiser = if tokens
-        .peek()
-        .is_some_and(|t| t.token_type == TokenType::Equal)
-    {
+    let initialiser = if check_next(tokens, TokenType::Equal) {
         tokens.next();
         Some(expression(tokens)?)
     } else {
@@ -436,6 +503,61 @@ fn var_declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
         "Expect ';' after variable declaration.",
     )?;
     Ok(Stmt::Var(Var::new(name, initialiser)))
+}
+
+fn function_declaration(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+    kind: &'static str,
+) -> Result<Stmt> {
+    // Consume FUN
+    tokens.next();
+    let name = consume(
+        tokens,
+        TokenType::Identifier,
+        &format!("Expect {} name.", kind),
+    )?;
+    consume(
+        tokens,
+        TokenType::LeftParen,
+        &format!("Expect '(' after {} name.", kind),
+    )?;
+
+    let mut params = Vec::new();
+    if !check_next(tokens, TokenType::RightParen) {
+        params.push(consume(
+            tokens,
+            TokenType::Identifier,
+            "Expect parameter name.",
+        )?);
+        while check_next(tokens, TokenType::Comma) {
+            tokens.next();
+            if params.len() >= 255 {
+                return Err(ParseError::new(
+                    tokens.next().unwrap(),
+                    "Can't have more than 255 parameters.",
+                ));
+            }
+            params.push(consume(
+                tokens,
+                TokenType::Identifier,
+                "Expect parameter name.",
+            )?);
+        }
+    }
+    consume(
+        tokens,
+        TokenType::RightParen,
+        "Expect ')' after parameters.",
+    )?;
+
+    consume(
+        tokens,
+        TokenType::LeftBrace,
+        &format!("Expect '{{' before {} body.", kind),
+    )?;
+    let body = block(tokens)?;
+
+    Ok(Stmt::Function(Function::new(name, params, body)))
 }
 
 fn synchronise(tokens: &mut Peekable<impl Iterator<Item = Token>>) {

@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::{
     token::{Token, TokenType},
     value::Value,
@@ -5,7 +7,7 @@ use crate::{
 use core::panic;
 use std::fmt::Display;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
@@ -14,6 +16,7 @@ pub enum Expr {
     Variable(Variable),
     Assign(Assign),
     Logical(Logical),
+    Call(Call),
 }
 
 impl Expr {
@@ -35,13 +38,14 @@ impl Display for Expr {
             Expr::Variable(variable) => variable.to_string(),
             Expr::Assign(assign) => assign.to_string(),
             Expr::Logical(logical) => logical.to_string(),
+            Expr::Call(call) => call.to_string(),
         };
 
         write!(f, "{}", str)
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub operator: Token,
@@ -64,7 +68,7 @@ impl Display for Binary {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Grouping {
     pub expr: Box<Expr>,
 }
@@ -83,7 +87,7 @@ impl Display for Grouping {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Literal {
     pub value: Value,
 }
@@ -100,7 +104,7 @@ impl Display for Literal {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Unary {
     pub operator: Token,
     pub expr: Box<Expr>,
@@ -121,7 +125,7 @@ impl Display for Unary {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Variable {
     pub name: Token,
 }
@@ -141,7 +145,7 @@ impl Display for Variable {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
@@ -162,7 +166,7 @@ impl Display for Assign {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Logical {
     pub left: Box<Expr>,
     pub operator: Token,
@@ -182,5 +186,30 @@ impl Logical {
 impl Display for Logical {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.operator, self.left, self.right)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Call {
+    pub callee: Box<Expr>,
+    pub paren: Token,
+    pub args: Box<[Expr]>,
+}
+
+impl Call {
+    pub fn new(callee: Expr, paren: Token, args: Vec<Expr>) -> Self {
+        Call {
+            callee: Box::new(callee),
+            paren,
+            args: args.into_boxed_slice(),
+        }
+    }
+}
+
+impl Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let arg_string = self.args.iter().map(|x| x.to_string()).join(", ");
+
+        write!(f, "{}({})", self.callee, arg_string)
     }
 }

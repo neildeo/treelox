@@ -2,6 +2,7 @@ use crate::expr::Expr;
 use crate::token::{Token, TokenType};
 use core::panic;
 
+#[derive(Clone, Debug)]
 pub enum Stmt {
     Expression(Expression),
     Print(Print),
@@ -9,8 +10,11 @@ pub enum Stmt {
     Block(Block),
     If(If),
     While(While),
+    Function(Function),
+    Return(Return),
 }
 
+#[derive(Clone, Debug)]
 pub struct Expression {
     pub expression: Expr,
 }
@@ -20,6 +24,8 @@ impl Expression {
         Expression { expression }
     }
 }
+
+#[derive(Clone, Debug)]
 pub struct Print {
     pub expression: Expr,
 }
@@ -30,6 +36,7 @@ impl Print {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Var {
     pub name: Token,
     pub initialiser: Option<Expr>,
@@ -44,6 +51,7 @@ impl Var {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Block {
     pub statements: Vec<Stmt>,
 }
@@ -54,6 +62,7 @@ impl Block {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct If {
     pub condition: Expr,
     pub body: Box<Stmt>,
@@ -70,6 +79,7 @@ impl If {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct While {
     pub condition: Expr,
     pub body: Box<Stmt>,
@@ -81,5 +91,30 @@ impl While {
             condition,
             body: Box::new(body),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+impl Function {
+    pub fn new(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        Function { name, params, body }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Return {
+    pub keyword: Token,
+    pub value: Expr,
+}
+
+impl Return {
+    pub fn new(keyword: Token, value: Expr) -> Self {
+        Return { keyword, value }
     }
 }

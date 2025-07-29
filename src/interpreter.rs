@@ -3,19 +3,28 @@ use std::{cell::RefCell, error::Error, fmt::Display, rc::Rc};
 use crate::{
     environment::Environment,
     expr::{self, Expr},
+    lox_callable::{LoxCallable, LoxFunction},
     stmt::{self, Stmt},
     token::{Token, TokenType},
-    value::{TypeError, Value},
+    value::{Clock, TypeError, Value},
 };
 
 pub struct Interpreter {
-    env: Rc<RefCell<Environment>>,
+    pub globals: Rc<RefCell<Environment>>,
+    pub env: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Rc::new(RefCell::new(Environment::new()));
+
+        globals
+            .borrow_mut()
+            .define_value("<native fn clock>", Value::Clock(Clock {}));
+
         Interpreter {
-            env: Rc::new(RefCell::new(Environment::new())),
+            globals: globals.clone(),
+            env: globals.clone(),
         }
     }
 
@@ -26,7 +35,7 @@ impl Interpreter {
         outer
     }
 
-    pub fn interpret(&mut self, statements: &Vec<Stmt>) -> Result<Option<Value>> {
+    pub fn interpret(&mut self, statements: &[Stmt]) -> Result<Option<Value>> {
         let mut value = None;
         for stmt in statements {
             value = self.interpret_stmt(stmt)?;
@@ -43,6 +52,8 @@ impl Interpreter {
             Stmt::Block(block) => self.interpret_stmt_block(block),
             Stmt::If(if_stmt) => self.interpret_stmt_if(if_stmt),
             Stmt::While(while_stmt) => self.interpret_stmt_while(while_stmt),
+            Stmt::Function(function_stmt) => self.interpret_stmt_function(function_stmt),
+            Stmt::Return(ret) => self.interpret_stmt_return(ret),
         }
     }
 
@@ -55,6 +66,7 @@ impl Interpreter {
             Expr::Variable(variable) => self.interpret_expr_variable(variable),
             Expr::Assign(assign) => self.interpret_expr_assign(assign),
             Expr::Logical(logical) => self.interpret_expr_logical(logical),
+            Expr::Call(call) => self.interpret_expr_call(call),
         }
     }
 
@@ -75,7 +87,7 @@ impl Interpreter {
             None => crate::value::Value::Nil,
         };
 
-        self.env.borrow_mut().define(stmt.name.clone(), value);
+        self.env.borrow_mut().define(&stmt.name, value);
 
         Ok(None)
     }
@@ -103,6 +115,20 @@ impl Interpreter {
         }
 
         Ok(None)
+    }
+
+    fn interpret_stmt_function(&mut self, stmt: &stmt::Function) -> Result<Option<Value>> {
+        let function = LoxFunction::new(stmt);
+        self.env
+            .borrow_mut()
+            .define(&stmt.name, Value::Function(function));
+        Ok(None)
+    }
+
+    fn interpret_stmt_return(&mut self, stmt: &stmt::Return) -> Result<Option<Value>> {
+        // The return value has been set to nil if not defined already
+        let value = self.interpret_expr(&stmt.value)?;
+        Err(RuntimeException::ReturnValue(ReturnValue { value }))
     }
 
     fn interpret_expr_binary(&mut self, expr: &expr::Binary) -> Result<Value> {
@@ -164,6 +190,40 @@ impl Interpreter {
         }
     }
 
+    fn interpret_expr_call(&mut self, expr: &expr::Call) -> Result<Value> {
+        let callee = self.interpret_expr(&expr.callee)?;
+
+        if !callee.is_callable() {
+            return Err(RuntimeException::new(
+                expr.paren.clone(),
+                "Can only call functions and classes.",
+            ));
+        }
+
+        let args = expr
+            .args
+            .iter()
+            .map(|a| self.interpret_expr(a))
+            .collect::<Result<Vec<Value>>>()?;
+
+        if args.len() != callee.arity() {
+            return Err(RuntimeException::new(
+                expr.paren.clone(),
+                &format!(
+                    "Expected {} arguments but got {}.",
+                    callee.arity(),
+                    args.len()
+                ),
+            ));
+        }
+
+        match callee.call(self, &args) {
+            Ok(val) => Ok(val),
+            Err(RuntimeException::ReturnValue(return_val)) => Ok(return_val.value),
+            Err(e) => Err(e),
+        }
+    }
+
     fn interpret_expr_logical(&mut self, expr: &expr::Logical) -> Result<Value> {
         let left = self.interpret_expr(&expr.left)?;
 
@@ -200,7 +260,10 @@ impl Interpreter {
     }
 
     fn interpret_expr_variable(&mut self, expr: &expr::Variable) -> Result<Value> {
-        self.env.borrow().get(&expr.name)
+        self.env
+            .borrow()
+            .get(&expr.name)
+            .map_err(RuntimeException::RuntimeError)
     }
 
     fn interpret_expr_assign(&mut self, expr: &expr::Assign) -> Result<Value> {
@@ -214,7 +277,7 @@ impl Interpreter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RuntimeError {
     token: Token,
     message: String,
@@ -241,10 +304,58 @@ impl Display for RuntimeError {
 
 impl Error for RuntimeError {}
 
-impl From<TypeError> for RuntimeError {
-    fn from(value: TypeError) -> Self {
-        RuntimeError::new(value.token, &value.message)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReturnValue {
+    value: Value,
+}
+
+impl Display for ReturnValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
-pub type Result<T> = std::result::Result<T, RuntimeError>;
+impl Error for ReturnValue {}
+
+#[derive(Clone, Debug)]
+pub enum RuntimeException {
+    RuntimeError(RuntimeError),
+    ReturnValue(ReturnValue),
+}
+
+impl RuntimeException {
+    fn new(token: Token, message: &str) -> Self {
+        RuntimeException::RuntimeError(RuntimeError::new(token, message))
+    }
+
+    fn new_return_value(value: Value) -> Self {
+        RuntimeException::ReturnValue(ReturnValue { value })
+    }
+}
+
+impl Display for RuntimeException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            RuntimeException::RuntimeError(runtime_error) => runtime_error.to_string(),
+            RuntimeException::ReturnValue(return_value) => return_value.to_string(),
+        };
+
+        write!(f, "{str}")
+    }
+}
+
+impl From<TypeError> for RuntimeException {
+    fn from(value: TypeError) -> Self {
+        RuntimeException::RuntimeError(RuntimeError::new(value.token, &value.message))
+    }
+}
+
+impl From<RuntimeError> for RuntimeException {
+    fn from(value: RuntimeError) -> Self {
+        RuntimeException::RuntimeError(value)
+    }
+}
+
+impl Error for RuntimeException {}
+
+pub type Result<T> = std::result::Result<T, RuntimeException>;

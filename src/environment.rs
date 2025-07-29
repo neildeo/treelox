@@ -22,8 +22,12 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: Token, value: Value) {
-        self.values.insert(name.lexeme, value);
+    pub fn define(&mut self, name: &Token, value: Value) {
+        self.values.insert(name.lexeme.clone(), value);
+    }
+
+    pub fn define_value(&mut self, name: &str, value: Value) {
+        self.values.insert(name.to_string(), value);
     }
 
     pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
