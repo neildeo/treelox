@@ -34,12 +34,14 @@ impl LoxCallable for Value {
 #[derive(Clone, Debug)]
 pub struct LoxFunction {
     declaration: Function,
+    closure: Rc<RefCell<Environment>>,
 }
 
 impl LoxFunction {
-    pub fn new(declaration: &Function) -> Self {
+    pub fn new(declaration: &Function, closure: &Rc<RefCell<Environment>>) -> Self {
         LoxFunction {
             declaration: declaration.clone(),
+            closure: closure.clone(),
         }
     }
 }
@@ -59,7 +61,7 @@ impl Display for LoxFunction {
 
 impl LoxCallable for LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, args: &[Value]) -> Result<Value> {
-        let mut fn_env = Environment::new_with_enclosing(&interpreter.globals);
+        let mut fn_env = Environment::new_with_enclosing(&self.closure);
         for (param, arg) in zip(&self.declaration.params, args) {
             fn_env.define(param, arg.clone());
             // println!("Bound var: {} = {}", param, arg);

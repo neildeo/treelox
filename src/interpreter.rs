@@ -118,7 +118,7 @@ impl Interpreter {
     }
 
     fn interpret_stmt_function(&mut self, stmt: &stmt::Function) -> Result<Option<Value>> {
-        let function = LoxFunction::new(stmt);
+        let function = LoxFunction::new(stmt, &self.env);
         self.env
             .borrow_mut()
             .define(&stmt.name, Value::Function(function));
