@@ -16,11 +16,11 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let globals = Rc::new(RefCell::new(Environment::new()));
+        let globals = Rc::new(RefCell::new(Environment::default()));
 
         globals
             .borrow_mut()
-            .define_value("<native fn clock>", Value::Clock(Clock {}));
+            .define_value("clock", Value::Clock(Clock {}));
 
         Interpreter {
             globals: globals.clone(),
@@ -326,10 +326,6 @@ pub enum RuntimeException {
 impl RuntimeException {
     fn new(token: Token, message: &str) -> Self {
         RuntimeException::RuntimeError(RuntimeError::new(token, message))
-    }
-
-    fn new_return_value(value: Value) -> Self {
-        RuntimeException::ReturnValue(ReturnValue { value })
     }
 }
 

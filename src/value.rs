@@ -38,7 +38,7 @@ impl LoxCallable for Clock {
 
 impl Display for Clock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<native fn>clock")
+        write!(f, "<native fn clock>")
     }
 }
 

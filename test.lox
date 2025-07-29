@@ -1,9 +1,4 @@
-// fun sayHi(first, last) {
-//   print "Hi, " + first + " " + last + "!";
-// }
-
-// sayHi("Dear", "Reader");
-// sayHi("Mr", "Tickle");
+print clock();
 
 fun fib(n) {
   if (n <= 1) return n;
@@ -14,6 +9,7 @@ for (var i = 0; i < 20; i = i + 1) {
   print fib(i);
 }
 
+print clock();
 print "";
 
 fun makeCounter() {
@@ -29,3 +25,4 @@ fun makeCounter() {
 var counter = makeCounter();
 counter(); // "1".
 counter(); // "2".
+print clock();

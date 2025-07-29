@@ -48,7 +48,7 @@ impl LoxFunction {
 
 // TODO: update this
 impl PartialEq for LoxFunction {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         false
     }
 }
