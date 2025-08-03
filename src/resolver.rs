@@ -10,6 +10,7 @@ use crate::{
 pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
     scopes: Scopes,
+    current_function: FunctionType,
 }
 
 struct Scopes(Vec<HashMap<String, VarStatus>>);
@@ -47,6 +48,12 @@ impl Scopes {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+enum FunctionType {
+    None,
+    Function,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum VarStatus {
     Defined,
     Undefined,
@@ -63,15 +70,23 @@ impl<'a> Resolver<'a> {
         Resolver {
             interpreter,
             scopes: Scopes::new(),
+            current_function: FunctionType::None,
         }
     }
 
-    pub fn resolve(&mut self, stmts: &[Stmt]) -> Result<()> {
+    pub fn resolve(&mut self, stmts: &[Stmt]) -> bool {
+        let mut had_error = false;
         for stmt in stmts {
-            self.resolve_stmt(stmt)?;
+            match self.resolve_stmt(stmt) {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("{}", e);
+                    had_error = true;
+                }
+            }
         }
 
-        Ok(())
+        had_error
     }
 
     fn resolve_stmt(&mut self, stmt: &Stmt) -> Result<()> {
@@ -89,13 +104,15 @@ impl<'a> Resolver<'a> {
 
     fn resolve_stmt_block(&mut self, block: &stmt::Block) -> Result<()> {
         self.begin_scope();
-        self.resolve(&block.statements)?;
+        for stmt in &block.statements {
+            self.resolve_stmt(stmt)?;
+        }
         self.end_scope();
         Ok(())
     }
 
     fn resolve_stmt_var(&mut self, var: &stmt::Var) -> Result<()> {
-        self.declare(&var.name);
+        self.declare(&var.name)?;
         if let Some(expr) = &var.initialiser {
             self.resolve_expr(expr)?;
         }
@@ -104,21 +121,28 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_stmt_function(&mut self, function: &stmt::Function) -> Result<()> {
-        self.declare(&function.name);
+        self.declare(&function.name)?;
         self.define(&function.name);
 
-        self.resolve_function(function)?;
+        self.resolve_function(function, FunctionType::Function)?;
         Ok(())
     }
 
-    fn resolve_function(&mut self, function: &stmt::Function) -> Result<()> {
+    fn resolve_function(&mut self, function: &stmt::Function, fn_type: FunctionType) -> Result<()> {
+        let enclosing_fn_type = self.current_function.clone();
+        self.current_function = fn_type;
+
         self.begin_scope();
         for param in &function.params {
-            self.declare(param);
+            self.declare(param)?;
             self.define(param);
         }
-        self.resolve(&function.body)?;
+        for stmt in &function.body {
+            self.resolve_stmt(stmt)?;
+        }
         self.end_scope();
+
+        self.current_function = enclosing_fn_type;
         Ok(())
     }
 
@@ -142,6 +166,13 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_stmt_return(&mut self, return_stmt: &stmt::Return) -> Result<()> {
+        if self.current_function == FunctionType::None {
+            return Err(ResolutionError::new(
+                return_stmt.keyword.clone(),
+                "Can't return from top-level code.",
+            ));
+        }
+
         self.resolve_expr(&return_stmt.value)?;
         Ok(())
     }
@@ -216,10 +247,17 @@ impl<'a> Resolver<'a> {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &Token) {
+    fn declare(&mut self, name: &Token) -> Result<()> {
         if let Some(scope) = self.scopes.peek_mut() {
+            if scope.contains_key(&name.lexeme) {
+                return Err(ResolutionError::new(
+                    name.clone(),
+                    "Already a variable with this name in this scope.",
+                ));
+            }
             scope.insert(name.lexeme.clone(), VarStatus::Undefined);
         }
+        Ok(())
     }
 
     fn define(&mut self, name: &Token) {

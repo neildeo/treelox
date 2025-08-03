@@ -50,10 +50,11 @@ impl Error for ParseError {}
 
 pub type Result<T> = std::result::Result<T, ParseError>;
 
-pub fn parse(tokens: Vec<Token>) -> Vec<Stmt> {
+pub fn parse(tokens: Vec<Token>) -> (Vec<Stmt>, bool) {
     let mut tokens = tokens.into_iter().peekable();
     let mut statements = Vec::new();
     let mut expr_id_list = ExprIdList::new();
+    let mut had_error = false;
 
     while let Some(token) = tokens.peek() {
         if token.token_type == TokenType::EOF {
@@ -62,11 +63,15 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Stmt> {
 
         match declaration(&mut tokens, &mut expr_id_list) {
             Ok(stmt) => statements.push(stmt),
-            Err(e) => eprintln!("{}", e.clone()),
+            Err(e) => {
+                eprintln!("{}", e);
+                synchronise(&mut tokens);
+                had_error = true;
+            }
         }
     }
 
-    statements
+    (statements, had_error)
 }
 
 pub fn consume(
@@ -570,23 +575,9 @@ fn declaration(
     expr_id_list: &mut ExprIdList,
 ) -> Result<Stmt> {
     if check_next(tokens, TokenType::Var) {
-        match var_declaration(tokens, expr_id_list) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                println!("{}", &e);
-                synchronise(tokens);
-                Err(e)
-            }
-        }
+        var_declaration(tokens, expr_id_list)
     } else if check_next(tokens, TokenType::Fun) {
-        match function_declaration(tokens, expr_id_list, "function") {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                println!("{}", &e);
-                synchronise(tokens);
-                Err(e)
-            }
-        }
+        function_declaration(tokens, expr_id_list, "function")
     } else {
         statement(tokens, expr_id_list)
     }
@@ -671,7 +662,6 @@ fn function_declaration(
 }
 
 fn synchronise(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
-    tokens.next();
     while let Some(t) = tokens.peek() {
         if t.token_type == TokenType::Semicolon {
             tokens.next();
@@ -691,5 +681,7 @@ fn synchronise(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
         ) {
             return;
         }
+
+        tokens.next();
     }
 }

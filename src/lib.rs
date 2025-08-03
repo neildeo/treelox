@@ -37,18 +37,15 @@ pub fn repl() -> ExitCode {
                     continue;
                 }
 
-                let stmts = parser::parse(tokens);
-                if stmts.is_empty() {
+                let (stmts, had_error) = parser::parse(tokens);
+                if had_error || stmts.is_empty() {
                     continue;
                 }
 
                 let mut resolver = Resolver::new(&mut interpreter);
-                match resolver.resolve(&stmts) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        println!("{}", e);
-                        continue;
-                    }
+                let had_error = resolver.resolve(&stmts);
+                if had_error {
+                    continue;
                 }
 
                 match interpreter.interpret(&stmts) {
@@ -60,7 +57,6 @@ pub fn repl() -> ExitCode {
                     Err(e) => {
                         println!("{}", e);
                         continue;
-                        // return ExitCode::from(70);
                     }
                 }
             }
@@ -90,20 +86,15 @@ pub fn interpret_file(filename: &Path) -> ExitCode {
         return ExitCode::from(65);
     }
 
-    // TODO: add had_error-style tracing to parse function
-    let stmts = parser::parse(tokens);
-    // This doesn't actually work: previous correct statements are still in the vec
-    if stmts.is_empty() {
+    let (stmts, had_error) = parser::parse(tokens);
+    if had_error || stmts.is_empty() {
         return ExitCode::from(65);
     }
 
     let mut resolver = Resolver::new(&mut interpreter);
-    match resolver.resolve(&stmts) {
-        Ok(()) => {}
-        Err(e) => {
-            println!("{}", e);
-            return ExitCode::from(70);
-        }
+    let had_error = resolver.resolve(&stmts);
+    if had_error {
+        return ExitCode::from(70);
     }
 
     match interpreter.interpret(&stmts) {
