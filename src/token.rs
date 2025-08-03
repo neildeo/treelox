@@ -139,7 +139,7 @@ impl Display for Token {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // Single character tokens
     LeftParen,

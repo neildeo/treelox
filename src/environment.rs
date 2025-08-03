@@ -45,6 +45,18 @@ impl Environment {
         }
     }
 
+    pub fn get_at_depth(&self, depth: usize, name: &Token) -> Result<Value, RuntimeError> {
+        if depth == 0 {
+            self.get(name)
+        } else {
+            self.enclosing
+                .as_ref()
+                .expect("Correct number of enclosing environments exist at runtime.")
+                .borrow()
+                .get_at_depth(depth - 1, name)
+        }
+    }
+
     pub fn assign(&mut self, name: Token, value: Value) -> Result<(), RuntimeError> {
         match self.values.contains_key(&name.lexeme) {
             true => {
@@ -62,6 +74,28 @@ impl Environment {
                 }
             }
         }
+    }
+
+    fn unchecked_assign(&mut self, name: Token, value: Value) {
+        self.values.insert(name.lexeme, value);
+    }
+
+    pub fn assign_at_depth(
+        &mut self,
+        depth: usize,
+        name: Token,
+        value: Value,
+    ) -> Result<(), RuntimeError> {
+        if depth == 0 {
+            self.unchecked_assign(name, value);
+        } else {
+            self.enclosing
+                .as_mut()
+                .unwrap()
+                .borrow_mut()
+                .unchecked_assign(name, value);
+        }
+        Ok(())
     }
 }
 

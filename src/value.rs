@@ -17,7 +17,7 @@ pub enum Value {
     Clock(Clock),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Clock;
 
 impl LoxCallable for Clock {

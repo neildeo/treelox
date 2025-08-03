@@ -3,6 +3,7 @@ mod expr;
 mod interpreter;
 mod lox_callable;
 mod parser;
+mod resolver;
 mod scanner;
 mod stmt;
 mod token;
@@ -15,7 +16,7 @@ use std::{
     process::ExitCode,
 };
 
-use crate::interpreter::Interpreter;
+use crate::{interpreter::Interpreter, resolver::Resolver};
 
 pub fn repl() -> ExitCode {
     let mut interpreter = Interpreter::new();
@@ -39,6 +40,15 @@ pub fn repl() -> ExitCode {
                 let stmts = parser::parse(tokens);
                 if stmts.is_empty() {
                     continue;
+                }
+
+                let mut resolver = Resolver::new(&mut interpreter);
+                match resolver.resolve(&stmts) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        println!("{}", e);
+                        continue;
+                    }
                 }
 
                 match interpreter.interpret(&stmts) {
@@ -85,6 +95,15 @@ pub fn interpret_file(filename: &Path) -> ExitCode {
     // This doesn't actually work: previous correct statements are still in the vec
     if stmts.is_empty() {
         return ExitCode::from(65);
+    }
+
+    let mut resolver = Resolver::new(&mut interpreter);
+    match resolver.resolve(&stmts) {
+        Ok(()) => {}
+        Err(e) => {
+            println!("{}", e);
+            return ExitCode::from(70);
+        }
     }
 
     match interpreter.interpret(&stmts) {

@@ -1,8 +1,8 @@
-use std::{cell::RefCell, error::Error, fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display, rc::Rc};
 
 use crate::{
     environment::Environment,
-    expr::{self, Expr},
+    expr::{self, Expr, ExprContent},
     lox_callable::{LoxCallable, LoxFunction},
     stmt::{self, Stmt},
     token::{Token, TokenType},
@@ -11,6 +11,7 @@ use crate::{
 
 pub struct Interpreter {
     pub globals: Rc<RefCell<Environment>>,
+    pub locals: Rc<RefCell<HashMap<usize, usize>>>,
     pub env: Rc<RefCell<Environment>>,
 }
 
@@ -24,6 +25,7 @@ impl Interpreter {
 
         Interpreter {
             globals: globals.clone(),
+            locals: Rc::new(RefCell::new(HashMap::new())),
             env: globals.clone(),
         }
     }
@@ -58,15 +60,15 @@ impl Interpreter {
     }
 
     pub fn interpret_expr(&mut self, expr: &Expr) -> Result<Value> {
-        match expr {
-            Expr::Binary(binary) => self.interpret_expr_binary(binary),
-            Expr::Grouping(grouping) => self.interpret_expr_grouping(grouping),
-            Expr::Literal(literal) => self.interpret_expr_literal(literal),
-            Expr::Unary(unary) => self.interpret_expr_unary(unary),
-            Expr::Variable(variable) => self.interpret_expr_variable(variable),
-            Expr::Assign(assign) => self.interpret_expr_assign(assign),
-            Expr::Logical(logical) => self.interpret_expr_logical(logical),
-            Expr::Call(call) => self.interpret_expr_call(call),
+        match &expr.content {
+            ExprContent::Binary(binary) => self.interpret_expr_binary(binary),
+            ExprContent::Grouping(grouping) => self.interpret_expr_grouping(grouping),
+            ExprContent::Literal(literal) => self.interpret_expr_literal(literal),
+            ExprContent::Unary(unary) => self.interpret_expr_unary(unary),
+            ExprContent::Variable(variable) => self.interpret_expr_variable(variable, expr.id),
+            ExprContent::Assign(assign) => self.interpret_expr_assign(assign, expr.id),
+            ExprContent::Logical(logical) => self.interpret_expr_logical(logical),
+            ExprContent::Call(call) => self.interpret_expr_call(call),
         }
     }
 
@@ -259,28 +261,50 @@ impl Interpreter {
         }
     }
 
-    fn interpret_expr_variable(&mut self, expr: &expr::Variable) -> Result<Value> {
-        self.env
-            .borrow()
-            .get(&expr.name)
-            .map_err(RuntimeException::RuntimeError)
+    fn interpret_expr_variable(&mut self, expr: &expr::Variable, id: usize) -> Result<Value> {
+        self.look_up_variable(&expr.name, id)
     }
 
-    fn interpret_expr_assign(&mut self, expr: &expr::Assign) -> Result<Value> {
+    fn interpret_expr_assign(&mut self, expr: &expr::Assign, id: usize) -> Result<Value> {
         let value = self.interpret_expr(&expr.value)?;
 
-        self.env
-            .borrow_mut()
-            .assign(expr.name.clone(), value.clone())?;
+        if let Some(&depth) = self.locals.borrow().get(&id) {
+            self.env
+                .borrow_mut()
+                .assign_at_depth(depth, expr.name.clone(), value.clone())?;
+        } else {
+            self.globals
+                .borrow_mut()
+                .assign(expr.name.clone(), value.clone())?;
+        }
 
         Ok(value)
+    }
+
+    pub fn resolve_at_depth(&mut self, expr: &Expr, depth: usize) -> Result<()> {
+        self.locals.borrow_mut().insert(expr.id, depth);
+        Ok(())
+    }
+
+    pub fn look_up_variable(&mut self, name: &Token, expr_id: usize) -> Result<Value> {
+        if let Some(depth) = self.locals.borrow().get(&expr_id) {
+            self.env
+                .borrow()
+                .get_at_depth(*depth, name)
+                .map_err(RuntimeException::RuntimeError)
+        } else {
+            self.globals
+                .borrow()
+                .get(name)
+                .map_err(RuntimeException::RuntimeError)
+        }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct RuntimeError {
-    token: Token,
-    message: String,
+    pub token: Token,
+    pub message: String,
 }
 
 impl RuntimeError {
