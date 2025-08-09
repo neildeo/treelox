@@ -45,6 +45,24 @@ impl Environment {
         }
     }
 
+    pub fn get_value(&self, name: &str) -> Result<Value, RuntimeError> {
+        if let Some(value) = self.values.get(name) {
+            Ok(value.clone())
+        } else if let Some(outer) = &self.enclosing {
+            outer.borrow().get_value(name)
+        } else {
+            Err(RuntimeError::new(
+                Token::new(
+                    crate::token::TokenType::This,
+                    name.to_string(),
+                    crate::token::LiteralValue::Null,
+                    0,
+                ),
+                &format!("Undefined variable '{}'.", name),
+            ))
+        }
+    }
+
     pub fn get_at_depth(&self, depth: usize, name: &Token) -> Result<Value, RuntimeError> {
         if depth == 0 {
             self.get(name)
@@ -54,6 +72,18 @@ impl Environment {
                 .expect("Correct number of enclosing environments exist at runtime.")
                 .borrow()
                 .get_at_depth(depth - 1, name)
+        }
+    }
+
+    pub fn get_value_at_depth(&self, depth: usize, name: &str) -> Result<Value, RuntimeError> {
+        if depth == 0 {
+            self.get_value(name)
+        } else {
+            self.enclosing
+                .as_ref()
+                .expect("Correct number of enclosing environments exist at runtime.")
+                .borrow()
+                .get_value_at_depth(depth - 1, name)
         }
     }
 

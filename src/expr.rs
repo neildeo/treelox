@@ -65,6 +65,9 @@ pub enum ExprContent {
     Assign(Assign),
     Logical(Logical),
     Call(Call),
+    Get(Get),
+    Set(Set),
+    This(This),
 }
 
 impl ExprContent {
@@ -87,6 +90,9 @@ impl Display for ExprContent {
             ExprContent::Assign(assign) => assign.to_string(),
             ExprContent::Logical(logical) => logical.to_string(),
             ExprContent::Call(call) => call.to_string(),
+            ExprContent::Get(get) => get.to_string(),
+            ExprContent::Set(set) => set.to_string(),
+            ExprContent::This(this) => this.to_string(),
         };
 
         write!(f, "{}", str)
@@ -259,5 +265,66 @@ impl Display for Call {
         let arg_string = self.args.iter().map(|x| x.to_string()).join(", ");
 
         write!(f, "{}({})", self.callee, arg_string)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Get {
+    pub name: Token,
+    pub object: Box<Expr>,
+}
+
+impl Get {
+    pub fn new(name: Token, object: Expr) -> Self {
+        Get {
+            name,
+            object: Box::new(object),
+        }
+    }
+}
+
+impl Display for Get {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", self.object, self.name)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Set {
+    pub name: Token,
+    pub object: Box<Expr>,
+    pub value: Box<Expr>,
+}
+
+impl Set {
+    pub fn new(name: Token, object: Expr, value: Expr) -> Self {
+        Set {
+            name,
+            object: Box::new(object),
+            value: Box::new(value),
+        }
+    }
+}
+
+impl Display for Set {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{} = {}", self.object, self.name, self.value)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct This {
+    pub keyword: Token,
+}
+
+impl This {
+    pub fn new(keyword: Token) -> Self {
+        This { keyword }
+    }
+}
+
+impl Display for This {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.keyword)
     }
 }

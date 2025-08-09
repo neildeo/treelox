@@ -4,6 +4,7 @@ use crate::{
     environment::Environment,
     expr::{self, Expr, ExprContent},
     lox_callable::{LoxCallable, LoxFunction},
+    lox_class::LoxClass,
     stmt::{self, Stmt},
     token::{Token, TokenType},
     value::{Clock, TypeError, Value},
@@ -56,6 +57,7 @@ impl Interpreter {
             Stmt::While(while_stmt) => self.interpret_stmt_while(while_stmt),
             Stmt::Function(function_stmt) => self.interpret_stmt_function(function_stmt),
             Stmt::Return(ret) => self.interpret_stmt_return(ret),
+            Stmt::Class(class) => self.interpret_stmt_class(class),
         }
     }
 
@@ -69,6 +71,9 @@ impl Interpreter {
             ExprContent::Assign(assign) => self.interpret_expr_assign(assign, expr.id),
             ExprContent::Logical(logical) => self.interpret_expr_logical(logical),
             ExprContent::Call(call) => self.interpret_expr_call(call),
+            ExprContent::Get(get) => self.interpret_expr_get(get),
+            ExprContent::Set(set) => self.interpret_expr_set(set),
+            ExprContent::This(this) => self.interpret_expr_this(this, expr.id),
         }
     }
 
@@ -120,7 +125,7 @@ impl Interpreter {
     }
 
     fn interpret_stmt_function(&mut self, stmt: &stmt::Function) -> Result<Option<Value>> {
-        let function = LoxFunction::new(stmt, &self.env);
+        let function = LoxFunction::new(stmt, &self.env, false);
         self.env
             .borrow_mut()
             .define(&stmt.name, Value::Function(function));
@@ -130,7 +135,31 @@ impl Interpreter {
     fn interpret_stmt_return(&mut self, stmt: &stmt::Return) -> Result<Option<Value>> {
         // The return value has been set to nil if not defined already
         let value = self.interpret_expr(&stmt.value)?;
-        Err(RuntimeException::ReturnValue(ReturnValue { value }))
+        Err(RuntimeException::ReturnValue(Box::new(ReturnValue {
+            value,
+        })))
+    }
+
+    fn interpret_stmt_class(&mut self, stmt: &stmt::Class) -> Result<Option<Value>> {
+        self.env.borrow_mut().define(&stmt.name, Value::Nil);
+
+        let mut methods = HashMap::new();
+        for method in &stmt.methods {
+            if let Stmt::Function(method) = method {
+                let function = LoxFunction::new(method, &self.env, &method.name.lexeme == "init");
+                methods.insert(method.name.lexeme.clone(), function);
+            } else {
+                panic!("Class method is not a function.");
+            }
+        }
+
+        let class = LoxClass::new(&stmt.name, methods);
+
+        self.env.borrow_mut().assign(
+            stmt.name.clone(),
+            Value::Class(Rc::new(RefCell::new(class))),
+        )?;
+        Ok(None)
     }
 
     fn interpret_expr_binary(&mut self, expr: &expr::Binary) -> Result<Value> {
@@ -281,6 +310,40 @@ impl Interpreter {
         Ok(value)
     }
 
+    fn interpret_expr_get(&mut self, expr: &expr::Get) -> Result<Value> {
+        let value = self.interpret_expr(&expr.object)?;
+        match value {
+            Value::ClassInstance(obj) => obj
+                .borrow()
+                .get(&expr.name)
+                .map_err(RuntimeException::RuntimeError),
+            _ => Err(RuntimeException::RuntimeError(RuntimeError::new(
+                expr.name.clone(),
+                "Only instances have properties.",
+            ))),
+        }
+    }
+
+    fn interpret_expr_set(&mut self, expr: &expr::Set) -> Result<Value> {
+        let object = self.interpret_expr(&expr.object)?;
+
+        match object {
+            Value::ClassInstance(object) => {
+                let value = self.interpret_expr(&expr.value)?;
+                object.borrow_mut().set(expr.name.clone(), value.clone());
+                Ok(value)
+            }
+            _ => Err(RuntimeException::RuntimeError(RuntimeError::new(
+                expr.name.clone(),
+                "Only instances have fields.",
+            ))),
+        }
+    }
+
+    fn interpret_expr_this(&mut self, expr: &expr::This, expr_id: usize) -> Result<Value> {
+        self.look_up_variable(&expr.keyword, expr_id)
+    }
+
     pub fn resolve_at_depth(&mut self, expr: &Expr, depth: usize) -> Result<()> {
         self.locals.borrow_mut().insert(expr.id, depth);
         Ok(())
@@ -344,7 +407,7 @@ impl Error for ReturnValue {}
 #[derive(Clone, Debug)]
 pub enum RuntimeException {
     RuntimeError(RuntimeError),
-    ReturnValue(ReturnValue),
+    ReturnValue(Box<ReturnValue>),
 }
 
 impl RuntimeException {

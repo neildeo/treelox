@@ -1,8 +1,8 @@
 use crate::expr::{
-    Assign, Binary, Call, Expr, ExprContent, ExprIdList, Grouping, Literal, Logical, Unary,
-    Variable,
+    Assign, Binary, Call, Expr, ExprContent, ExprIdList, Get, Grouping, Literal, Logical, Set,
+    This, Unary, Variable,
 };
-use crate::stmt::{Block, Expression, Function, If, Print, Return, Stmt, Var, While};
+use crate::stmt::{Block, Class, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token::{Token, TokenType};
 use crate::value::Value;
 use std::error::Error;
@@ -141,6 +141,7 @@ fn primary(
             ExprContent::Variable(Variable::new(t)),
             expr_id_list,
         )),
+        TokenType::This => Ok(Expr::new(ExprContent::This(This::new(t)), expr_id_list)),
         _ => Err(ParseError::new(t, "Unexpected token in expression")),
     };
 
@@ -162,6 +163,15 @@ fn call(
             // Consume the left paren
             tokens.next();
             expr = finish_call(tokens, expr_id_list, expr)?;
+        } else if check_next(tokens, TokenType::Dot) {
+            // Consume the dot
+            tokens.next();
+            let name = consume(
+                tokens,
+                TokenType::Identifier,
+                "Expect property name after '.'.",
+            )?;
+            expr = Expr::new(ExprContent::Get(Get::new(name, expr)), expr_id_list);
         } else {
             break;
         }
@@ -319,6 +329,11 @@ fn assignment(
         if let Some(name) = expr.content.get_name() {
             return Ok(Expr::new(
                 ExprContent::Assign(Assign::new(name, value)),
+                expr_id_list,
+            ));
+        } else if let ExprContent::Get(get) = expr.content {
+            return Ok(Expr::new(
+                ExprContent::Set(Set::new(get.name, *get.object, value)),
                 expr_id_list,
             ));
         }
@@ -577,7 +592,11 @@ fn declaration(
     if check_next(tokens, TokenType::Var) {
         var_declaration(tokens, expr_id_list)
     } else if check_next(tokens, TokenType::Fun) {
+        // Consume FUN
+        tokens.next();
         function_declaration(tokens, expr_id_list, "function")
+    } else if check_next(tokens, TokenType::Class) {
+        class_declaration(tokens, expr_id_list)
     } else {
         statement(tokens, expr_id_list)
     }
@@ -610,8 +629,6 @@ fn function_declaration(
     expr_id_list: &mut ExprIdList,
     kind: &'static str,
 ) -> Result<Stmt> {
-    // Consume FUN
-    tokens.next();
     let name = consume(
         tokens,
         TokenType::Identifier,
@@ -659,6 +676,34 @@ fn function_declaration(
     let body = block(tokens, expr_id_list)?;
 
     Ok(Stmt::Function(Function::new(name, params, body)))
+}
+
+fn class_declaration(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+    expr_id_list: &mut ExprIdList,
+) -> Result<Stmt> {
+    // Consume CLASS
+    tokens.next();
+
+    let name = consume(tokens, TokenType::Identifier, "Expect class name.")?;
+    consume(
+        tokens,
+        TokenType::LeftBrace,
+        "Expect '{' before class body.",
+    )?;
+
+    let mut methods = Vec::new();
+    while !check_next(tokens, TokenType::RightBrace) && !check_next(tokens, TokenType::EOF) {
+        methods.push(function_declaration(tokens, expr_id_list, "method")?);
+    }
+
+    consume(
+        tokens,
+        TokenType::RightBrace,
+        "Expect '}' after class body.",
+    )?;
+
+    Ok(Stmt::Class(Class::new(name, methods)))
 }
 
 fn synchronise(tokens: &mut Peekable<impl Iterator<Item = Token>>) {

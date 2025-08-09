@@ -1,7 +1,8 @@
-use std::{fmt::Display, time::UNIX_EPOCH};
+use std::{cell::RefCell, fmt::Display, rc::Rc, time::UNIX_EPOCH};
 
 use crate::{
     lox_callable::{LoxCallable, LoxFunction},
+    lox_class::{LoxClass, LoxInstance},
     token::Token,
 };
 
@@ -13,6 +14,8 @@ pub enum Value {
     String(String),
     Number(f64),
     Function(LoxFunction),
+    Class(Rc<RefCell<LoxClass>>),
+    ClassInstance(Rc<RefCell<LoxInstance>>),
     // Native functions
     Clock(Clock),
 }
@@ -52,6 +55,8 @@ impl Value {
             Value::Number(_) => true,
             Value::Clock(_) => true,
             Value::Function(_) => true,
+            Value::Class(_) => true,
+            Value::ClassInstance(_) => true,
         }
     }
 
@@ -76,7 +81,7 @@ impl Value {
     }
 
     pub fn is_callable(&self) -> bool {
-        matches!(self, Value::Function(_) | Value::Clock(_))
+        matches!(self, Value::Function(_) | Value::Class(_) | Value::Clock(_))
     }
 }
 
@@ -114,6 +119,12 @@ impl Display for TypeError {
     }
 }
 
+impl From<LoxInstance> for Value {
+    fn from(value: LoxInstance) -> Self {
+        Self::ClassInstance(Rc::new(RefCell::new(value)))
+    }
+}
+
 impl TryFrom<Value> for f64 {
     type Error = String;
 
@@ -146,6 +157,8 @@ impl Display for Value {
             Value::Number(x) => &x.to_string(),
             Value::Clock(clock) => &clock.to_string(),
             Value::Function(lox_function) => &lox_function.to_string(),
+            Value::Class(lox_class) => &lox_class.borrow().to_string(),
+            Value::ClassInstance(lox_instance) => &lox_instance.borrow().to_string(),
         };
 
         write!(f, "{value_string}")

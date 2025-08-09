@@ -1,5 +1,6 @@
-use crate::expr::Expr;
+use crate::expr::{Expr, ExprContent, Literal};
 use crate::token::{Token, TokenType};
+use crate::value::Value;
 use core::panic;
 
 #[derive(Clone, Debug)]
@@ -12,6 +13,7 @@ pub enum Stmt {
     While(While),
     Function(Function),
     Return(Return),
+    Class(Class),
 }
 
 #[derive(Clone, Debug)]
@@ -116,5 +118,27 @@ pub struct Return {
 impl Return {
     pub fn new(keyword: Token, value: Expr) -> Self {
         Return { keyword, value }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(
+            self.value.content,
+            ExprContent::Literal(Literal { value: Value::Nil })
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Class {
+    pub name: Token,
+    pub methods: Box<[Stmt]>,
+}
+
+impl Class {
+    pub fn new(name: Token, methods: Vec<Stmt>) -> Self {
+        Class {
+            name,
+            methods: methods.into_boxed_slice(),
+        }
     }
 }

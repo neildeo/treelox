@@ -11,6 +11,7 @@ pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
     scopes: Scopes,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 struct Scopes(Vec<HashMap<String, VarStatus>>);
@@ -51,6 +52,14 @@ impl Scopes {
 enum FunctionType {
     None,
     Function,
+    Initialiser,
+    Method,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ClassType {
+    None,
+    Class,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,6 +80,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: Scopes::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -99,6 +109,7 @@ impl<'a> Resolver<'a> {
             Stmt::If(if_stmt) => self.resolve_stmt_if(if_stmt),
             Stmt::While(while_stmt) => self.resolve_stmt_while(while_stmt),
             Stmt::Return(return_stmt) => self.resolve_stmt_return(return_stmt),
+            Stmt::Class(class) => self.resolve_stmt_class(class),
         }
     }
 
@@ -173,6 +184,13 @@ impl<'a> Resolver<'a> {
             ));
         }
 
+        if !return_stmt.is_null() && self.current_function == FunctionType::Initialiser {
+            return Err(ResolutionError::new(
+                return_stmt.keyword.clone(),
+                "Can't return a value from an initialiser.",
+            ));
+        }
+
         self.resolve_expr(&return_stmt.value)?;
         Ok(())
     }
@@ -180,6 +198,39 @@ impl<'a> Resolver<'a> {
     fn resolve_stmt_while(&mut self, while_stmt: &stmt::While) -> Result<()> {
         self.resolve_expr(&while_stmt.condition)?;
         self.resolve_stmt(&while_stmt.body)?;
+        Ok(())
+    }
+
+    fn resolve_stmt_class(&mut self, class_stmt: &stmt::Class) -> Result<()> {
+        let enclosing_class_type = self.current_class.clone();
+        self.current_class = ClassType::Class;
+
+        self.declare(&class_stmt.name)?;
+        self.define(&class_stmt.name);
+
+        self.begin_scope();
+        self.scopes
+            .peek_mut()
+            .expect("Just pushed a scope")
+            .insert("this".to_string(), VarStatus::Defined);
+
+        for method in &class_stmt.methods {
+            if let Stmt::Function(method) = method {
+                let declaration = if &method.name.lexeme == "init" {
+                    FunctionType::Initialiser
+                } else {
+                    FunctionType::Method
+                };
+                self.resolve_function(method, declaration)?;
+            } else {
+                panic!("Non-function method in class: {method:?}");
+            }
+        }
+
+        self.end_scope();
+
+        self.current_class = enclosing_class_type;
+
         Ok(())
     }
 
@@ -224,6 +275,20 @@ impl<'a> Resolver<'a> {
                     self.resolve_expr(arg)?;
                 }
                 Ok(())
+            }
+            ExprContent::Get(get) => self.resolve_expr(&get.object),
+            ExprContent::Set(set) => {
+                self.resolve_expr(&set.value)?;
+                self.resolve_expr(&set.object)
+            }
+            ExprContent::This(this) => {
+                if self.current_class == ClassType::None {
+                    return Err(ResolutionError::new(
+                        this.keyword.clone(),
+                        "Can't use 'this' outside of a class.",
+                    ));
+                }
+                self.resolve_expr_local(expr, &this.keyword)
             }
         }
     }

@@ -1,15 +1,55 @@
-print "Scope issue example:";
-
-var a = "global";
-{
-  fun showA() {
-    print a;
+class CornishClottedCream {
+  init() {
+    return;
   }
 
-  showA();
-  var a = "block";
-  showA();
+  serveOn() {
+    return "Scones";
+  }
 }
 
-// Causes ResolutionError
-return "global return - not allowed!";
+var snack = CornishClottedCream();
+print snack;
+
+class Bagel {
+  init(flavour) {
+    this.flavour = flavour;
+    this.plate = "small plate";
+  }
+
+  describe() {
+    print "A " + this.flavour + " bagel with " + this.topping + " on top, served on a " + this.plate + ".";
+  }
+}
+var bagel = Bagel("sesame");
+bagel.topping = "cream cheese";
+bagel.describe();
+bagel.plate = "grand platter";
+bagel.flavour = "cinnamon";
+bagel.describe();
+
+class Bacon {
+  eat() {
+    print "Crunch crunch crunch!";
+  }
+}
+
+var bacon_method = Bacon().eat;
+bacon_method();
+Bacon().eat();
+
+class Cake {
+  taste(adjective) {
+    print "The " + this.flavour + " cake is " + adjective + "!";
+  }
+}
+
+var cake = Cake();
+cake.flavour = "Victoria sponge";
+cake.taste("delicious");
+cake.flavour = "chocolate";
+cake.taste("delicious");
+cake.flavour = "prepackaged presliced Madeira";
+cake.taste("even more delicious");
+
+// print this; // Raises resolution error
