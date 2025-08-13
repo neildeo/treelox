@@ -142,6 +142,19 @@ fn primary(
             expr_id_list,
         )),
         TokenType::This => Ok(Expr::new(ExprContent::This(This::new(t)), expr_id_list)),
+        // TokenType::Super => {
+        //     let keyword = t;
+        //     consume(tokens, TokenType::Dot, "Expect '.' after 'super'.")?;
+        //     let method = consume(
+        //         tokens,
+        //         TokenType::Identifier,
+        //         "Expect superclass method name.",
+        //     )?;
+        //     Ok(Expr::new(
+        //         ExprContent::Super(Super::new(keyword, method)),
+        //         expr_id_list,
+        //     ))
+        // }
         _ => Err(ParseError::new(t, "Unexpected token in expression")),
     };
 
@@ -686,6 +699,19 @@ fn class_declaration(
     tokens.next();
 
     let name = consume(tokens, TokenType::Identifier, "Expect class name.")?;
+
+    let superclass = if check_next(tokens, TokenType::Less) {
+        // Consume '<';
+        tokens.next();
+        let identifier = consume(tokens, TokenType::Identifier, "Expect superclass name.")?;
+        Some(Expr::new(
+            ExprContent::Variable(Variable::new(identifier)),
+            expr_id_list,
+        ))
+    } else {
+        None
+    };
+
     consume(
         tokens,
         TokenType::LeftBrace,
@@ -703,7 +729,7 @@ fn class_declaration(
         "Expect '}' after class body.",
     )?;
 
-    Ok(Stmt::Class(Class::new(name, methods)))
+    Ok(Stmt::Class(Class::new(name, superclass, methods)))
 }
 
 fn synchronise(tokens: &mut Peekable<impl Iterator<Item = Token>>) {

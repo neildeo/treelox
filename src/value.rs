@@ -125,6 +125,12 @@ impl From<LoxInstance> for Value {
     }
 }
 
+impl From<LoxFunction> for Value {
+    fn from(value: LoxFunction) -> Self {
+        Self::Function(value)
+    }
+}
+
 impl TryFrom<Value> for f64 {
     type Error = String;
 

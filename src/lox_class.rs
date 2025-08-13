@@ -9,20 +9,32 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LoxClass {
-    name: String,
+    pub name: String,
+    superclass: Option<Rc<RefCell<LoxClass>>>,
     methods: HashMap<String, LoxFunction>,
 }
 
 impl LoxClass {
-    pub fn new(name: &Token, methods: HashMap<String, LoxFunction>) -> Self {
+    pub fn new(
+        name: &Token,
+        superclass: Option<Rc<RefCell<LoxClass>>>,
+        methods: HashMap<String, LoxFunction>,
+    ) -> Self {
         LoxClass {
             name: name.lexeme.clone(),
+            superclass,
             methods,
         }
     }
 
-    fn find_method(&self, name: &str) -> Option<LoxFunction> {
-        self.methods.get(name).cloned()
+    pub fn find_method(&self, name: &str) -> Option<LoxFunction> {
+        self.methods.get(name).cloned().or_else(|| {
+            if let Some(superclass) = &self.superclass {
+                superclass.borrow().find_method(name)
+            } else {
+                None
+            }
+        })
     }
 }
 

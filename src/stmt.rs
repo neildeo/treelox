@@ -131,13 +131,15 @@ impl Return {
 #[derive(Clone, Debug)]
 pub struct Class {
     pub name: Token,
+    pub superclass: Option<Expr>,
     pub methods: Box<[Stmt]>,
 }
 
 impl Class {
-    pub fn new(name: Token, methods: Vec<Stmt>) -> Self {
+    pub fn new(name: Token, superclass: Option<Expr>, methods: Vec<Stmt>) -> Self {
         Class {
             name,
+            superclass,
             methods: methods.into_boxed_slice(),
         }
     }

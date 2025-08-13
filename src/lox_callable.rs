@@ -1,4 +1,9 @@
-use std::{cell::RefCell, fmt::Display, iter::zip, rc::Rc};
+use std::{
+    cell::RefCell,
+    fmt::{Debug, Display},
+    iter::zip,
+    rc::Rc,
+};
 
 use crate::{
     environment::Environment,
@@ -33,11 +38,20 @@ impl LoxCallable for Value {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LoxFunction {
     declaration: Function,
     closure: Rc<RefCell<Environment>>,
     is_initialiser: bool,
+}
+
+impl Debug for LoxFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoxFunction")
+            .field("declaration", &self.declaration)
+            .field("is_initialiser", &self.is_initialiser)
+            .finish()
+    }
 }
 
 impl LoxFunction {

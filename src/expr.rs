@@ -68,6 +68,7 @@ pub enum ExprContent {
     Get(Get),
     Set(Set),
     This(This),
+    // Super(Super),
 }
 
 impl ExprContent {
@@ -93,6 +94,7 @@ impl Display for ExprContent {
             ExprContent::Get(get) => get.to_string(),
             ExprContent::Set(set) => set.to_string(),
             ExprContent::This(this) => this.to_string(),
+            // ExprContent::Super(sup) => sup.to_string(),
         };
 
         write!(f, "{}", str)
@@ -328,3 +330,21 @@ impl Display for This {
         write!(f, "{}", self.keyword)
     }
 }
+
+// #[derive(Clone, Debug)]
+// pub struct Super {
+//     pub keyword: Token,
+//     pub method: Token,
+// }
+
+// impl Super {
+//     pub fn new(keyword: Token, method: Token) -> Self {
+//         Super { keyword, method }
+//     }
+// }
+
+// impl Display for Super {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}.{}", self.keyword, self.method)
+//     }
+// }

@@ -14,6 +14,7 @@ pub struct Resolver<'a> {
     current_class: ClassType,
 }
 
+#[derive(Debug)]
 struct Scopes(Vec<HashMap<String, VarStatus>>);
 
 impl Scopes {
@@ -208,6 +209,27 @@ impl<'a> Resolver<'a> {
         self.declare(&class_stmt.name)?;
         self.define(&class_stmt.name);
 
+        if let Some(superclass) = &class_stmt.superclass {
+            if let ExprContent::Variable(crate::expr::Variable { name }) = &superclass.content {
+                if name.lexeme == class_stmt.name.lexeme {
+                    return Err(ResolutionError::new(
+                        name.clone(),
+                        "A class can't inherit from itself.",
+                    ));
+                }
+            } else {
+                panic!("Superclass is not a variable!")
+            }
+
+            self.resolve_expr(superclass)?;
+
+            self.begin_scope();
+            self.scopes
+                .peek_mut()
+                .expect("Just pushed a scope")
+                .insert("super".to_string(), VarStatus::Defined);
+        }
+
         self.begin_scope();
         self.scopes
             .peek_mut()
@@ -226,8 +248,11 @@ impl<'a> Resolver<'a> {
                 panic!("Non-function method in class: {method:?}");
             }
         }
-
         self.end_scope();
+
+        if class_stmt.superclass.is_some() {
+            self.end_scope();
+        }
 
         self.current_class = enclosing_class_type;
 
@@ -289,7 +314,7 @@ impl<'a> Resolver<'a> {
                     ));
                 }
                 self.resolve_expr_local(expr, &this.keyword)
-            }
+            } // ExprContent::Super(sup) => self.resolve_expr_local(expr, &sup.keyword),
         }
     }
 

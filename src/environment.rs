@@ -4,8 +4,8 @@ use crate::{interpreter::RuntimeError, token::Token, value::Value};
 
 #[derive(Debug)]
 pub struct Environment {
-    values: HashMap<String, Value>,
-    enclosing: Option<Rc<RefCell<Environment>>>,
+    pub values: HashMap<String, Value>,
+    pub enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
