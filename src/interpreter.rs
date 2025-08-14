@@ -74,6 +74,7 @@ impl Interpreter {
             ExprContent::Get(get) => self.interpret_expr_get(get),
             ExprContent::Set(set) => self.interpret_expr_set(set),
             ExprContent::This(this) => self.interpret_expr_this(this, expr.id),
+            ExprContent::Super(sup) => self.interpret_expr_super(sup, expr.id),
         }
     }
 
@@ -141,10 +142,8 @@ impl Interpreter {
     }
 
     fn interpret_stmt_class(&mut self, stmt: &stmt::Class) -> Result<Option<Value>> {
-        // println!("Class: {:?}", &stmt);
         let superclass = if let Some(superclass) = &stmt.superclass {
             let maybe_super = self.interpret_expr(superclass)?;
-            // println!("Superclass: {:?}", self.env.borrow().get_value("Scone"));
             match maybe_super {
                 Value::Class(superclass) => Some(superclass),
                 _ => {
@@ -164,11 +163,10 @@ impl Interpreter {
         let outer = if let Some(superclass) = &stmt.superclass {
             let superclass = self.interpret_expr(superclass)?;
             let outer = self.push_scope();
-            if let Value::Class(ref s) = superclass {
+            if let Value::Class(_) = superclass {
                 self.env
                     .borrow_mut()
-                    .define_value(&s.borrow().name, superclass.clone());
-                // println!("Superclass identified: {:?}", &superclass);
+                    .define_value("super", superclass.clone());
             } else {
                 return Err(
                     RuntimeError::new(stmt.name.clone(), "Superclass is not a Lox Class").into(),
@@ -194,8 +192,6 @@ impl Interpreter {
         if let Some(outer) = outer {
             self.env = outer;
         }
-
-        println!("Class: {:?}", &class);
 
         self.env.borrow_mut().assign(
             stmt.name.clone(),
@@ -334,7 +330,6 @@ impl Interpreter {
     }
 
     fn interpret_expr_variable(&mut self, expr: &expr::Variable, id: usize) -> Result<Value> {
-        println!("Looking up variable: {:?}", &expr);
         self.look_up_variable(&expr.name, id)
     }
 
@@ -388,6 +383,27 @@ impl Interpreter {
         self.look_up_variable(&expr.keyword, expr_id)
     }
 
+    fn interpret_expr_super(&mut self, expr: &expr::Super, expr_id: usize) -> Result<Value> {
+        let depth = *self.locals.borrow().get(&expr_id).expect("Super exists.");
+        let superclass =
+            if let Value::Class(c) = self.env.borrow().get_value_at_depth(depth, "super")? {
+                c
+            } else {
+                unreachable!("'super' is definitely a class");
+            };
+
+        let object = self.env.borrow().get_value_at_depth(depth - 1, "this")?;
+
+        let method = superclass.borrow().find_method(&expr.method.lexeme).ok_or(
+            RuntimeException::RuntimeError(RuntimeError::new(
+                expr.method.clone(),
+                &format!("Undefined property '{}'.", expr.method.lexeme),
+            )),
+        )?;
+
+        Ok(method.bind(&object).into())
+    }
+
     pub fn resolve_at_depth(&mut self, expr: &Expr, depth: usize) -> Result<()> {
         self.locals.borrow_mut().insert(expr.id, depth);
         Ok(())
@@ -395,13 +411,11 @@ impl Interpreter {
 
     pub fn look_up_variable(&mut self, name: &Token, expr_id: usize) -> Result<Value> {
         if let Some(depth) = self.locals.borrow().get(&expr_id) {
-            // println!("Depth of {name}: {depth}");
             self.env
                 .borrow()
                 .get_at_depth(*depth, name)
                 .map_err(RuntimeException::RuntimeError)
         } else {
-            // println!("{name} is global");
             self.globals
                 .borrow()
                 .get(name)

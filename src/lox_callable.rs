@@ -102,7 +102,6 @@ impl LoxCallable for LoxFunction {
         let mut fn_env = Environment::new_with_enclosing(&self.closure);
         for (param, arg) in zip(&self.declaration.params, args) {
             fn_env.define(param, arg.clone());
-            // println!("Bound var: {} = {}", param, arg);
         }
 
         let previous = interpreter.env.clone();

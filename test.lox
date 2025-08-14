@@ -8,10 +8,9 @@ class Scone {
   }
 }
 
-Scone().instructions();
-
 class CornishClottedCream < Scone {
   instructions() {
+    super.instructions();
     print "Really slather it on...";
     this.serve();
   }
@@ -19,3 +18,12 @@ class CornishClottedCream < Scone {
 
 var snack = CornishClottedCream();
 snack.instructions();
+
+class Eclair {
+  cook() {
+    // super.cook();                          // Causes a ResolutionError
+    print "Pipe full of crème pâtissière.";
+  }
+}
+
+Eclair().cook();

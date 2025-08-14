@@ -1,6 +1,6 @@
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprContent, ExprIdList, Get, Grouping, Literal, Logical, Set,
-    This, Unary, Variable,
+    Super, This, Unary, Variable,
 };
 use crate::stmt::{Block, Class, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token::{Token, TokenType};
@@ -142,19 +142,19 @@ fn primary(
             expr_id_list,
         )),
         TokenType::This => Ok(Expr::new(ExprContent::This(This::new(t)), expr_id_list)),
-        // TokenType::Super => {
-        //     let keyword = t;
-        //     consume(tokens, TokenType::Dot, "Expect '.' after 'super'.")?;
-        //     let method = consume(
-        //         tokens,
-        //         TokenType::Identifier,
-        //         "Expect superclass method name.",
-        //     )?;
-        //     Ok(Expr::new(
-        //         ExprContent::Super(Super::new(keyword, method)),
-        //         expr_id_list,
-        //     ))
-        // }
+        TokenType::Super => {
+            let keyword = t;
+            consume(tokens, TokenType::Dot, "Expect '.' after 'super'.")?;
+            let method = consume(
+                tokens,
+                TokenType::Identifier,
+                "Expect superclass method name.",
+            )?;
+            Ok(Expr::new(
+                ExprContent::Super(Super::new(keyword, method)),
+                expr_id_list,
+            ))
+        }
         _ => Err(ParseError::new(t, "Unexpected token in expression")),
     };
 

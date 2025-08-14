@@ -10,7 +10,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub struct LoxClass {
     pub name: String,
-    superclass: Option<Rc<RefCell<LoxClass>>>,
+    pub superclass: Option<Rc<RefCell<LoxClass>>>,
     methods: HashMap<String, LoxFunction>,
 }
 

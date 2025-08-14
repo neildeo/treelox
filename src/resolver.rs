@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use crate::{
     expr::{Expr, ExprContent},
@@ -12,6 +12,16 @@ pub struct Resolver<'a> {
     scopes: Scopes,
     current_function: FunctionType,
     current_class: ClassType,
+}
+
+impl<'a> Debug for Resolver<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Resolver")
+            .field("scopes", &self.scopes)
+            .field("current_function", &self.current_function)
+            .field("current_class", &self.current_class)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -61,6 +71,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    Subclass,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -210,6 +221,8 @@ impl<'a> Resolver<'a> {
         self.define(&class_stmt.name);
 
         if let Some(superclass) = &class_stmt.superclass {
+            self.current_class = ClassType::Subclass;
+            // Check we are not self-inheriting
             if let ExprContent::Variable(crate::expr::Variable { name }) = &superclass.content {
                 if name.lexeme == class_stmt.name.lexeme {
                     return Err(ResolutionError::new(
@@ -250,6 +263,7 @@ impl<'a> Resolver<'a> {
         }
         self.end_scope();
 
+        // Close super scope if it was ever opened.
         if class_stmt.superclass.is_some() {
             self.end_scope();
         }
@@ -314,7 +328,21 @@ impl<'a> Resolver<'a> {
                     ));
                 }
                 self.resolve_expr_local(expr, &this.keyword)
-            } // ExprContent::Super(sup) => self.resolve_expr_local(expr, &sup.keyword),
+            }
+            ExprContent::Super(sup) => {
+                if self.current_class == ClassType::None {
+                    return Err(ResolutionError::new(
+                        sup.keyword.clone(),
+                        "Can't use 'super' outside of a class.",
+                    ));
+                } else if self.current_class != ClassType::Subclass {
+                    return Err(ResolutionError::new(
+                        sup.keyword.clone(),
+                        "Can't use 'super' in a class with no superclass.",
+                    ));
+                }
+                self.resolve_expr_local(expr, &sup.keyword)
+            }
         }
     }
 
